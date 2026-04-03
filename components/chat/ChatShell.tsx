@@ -21,14 +21,20 @@ export function ChatShell({
   const hasActiveChat = Boolean(segment);
 
   return (
-    <div className="flex flex-1 min-h-0 bg-[var(--background)]">
+    // h-full fills the <main> height from DashboardShell.
+    // overflow-hidden ensures nothing leaks outside the chat frame.
+    <div className="flex h-full overflow-hidden bg-[var(--background)]">
+
+      {/* ── Sidebar ──────────────────────────────────────────── */}
+      {/* min-h-0 is required so this flex child can shrink in a flex-col parent */}
       <aside
         className={cn(
-          "min-h-0 w-full shrink-0 border-r border-[var(--brand-primary)]/10 bg-[#f8fafc] md:flex md:w-80 md:flex-col",
-          hasActiveChat ? "hidden md:flex" : "flex flex-col"
+          "flex shrink-0 flex-col w-full overflow-hidden border-r border-[var(--brand-primary)]/10 bg-[#f8fafc] md:w-80",
+          hasActiveChat ? "hidden md:flex" : "flex"
         )}
       >
-        <div className="flex-none border-b border-[var(--brand-primary)]/10 px-4 py-4">
+        {/* Sidebar header — fixed, never scrolls */}
+        <div className="shrink-0 border-b border-[var(--brand-primary)]/10 px-4 py-4">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight text-gray-900">
@@ -43,14 +49,17 @@ export function ChatShell({
           </div>
         </div>
 
+        {/* Conversation list — only this part scrolls */}
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pt-3">
           <ChatSidebarList initialChats={chats} />
         </div>
       </aside>
 
+      {/* ── Inbox Panel ──────────────────────────────────────── */}
+      {/* overflow-hidden so the ChatWindow can manage its own scroll */}
       <section
         className={cn(
-          "min-h-0 flex-1 flex-col bg-white md:flex",
+          "flex min-h-0 flex-1 flex-col overflow-hidden bg-white",
           hasActiveChat ? "flex" : "hidden md:flex"
         )}
       >

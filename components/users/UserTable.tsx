@@ -2,17 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   Users,
-  Mail,
-  Phone,
-  Building2,
-  Briefcase,
   ShieldCheck,
-  MoreVertical,
   Search,
-  Filter,
   ChevronDown,
 } from "lucide-react";
 import type { User } from "@/lib/types";
@@ -24,14 +17,13 @@ interface Props {
   roles: { id: string; name: string }[];
 }
 
-const GENDER_ICONS: Record<string, string> = {
-  Male: "♂",
-  Female: "♀",
-  Other: "⚥",
+const GENDER_LABELS: Record<string, { label: string; color: string }> = {
+  Male:   { label: "Male",   color: "bg-blue-50 text-blue-700 border-blue-200" },
+  Female: { label: "Female", color: "bg-pink-50 text-pink-700 border-pink-200" },
+  Other:  { label: "Other",  color: "bg-purple-50 text-purple-700 border-purple-200" },
 };
 
 export function UserTable({ users: initialUsers, departments, roles }: Props) {
-  const router = useRouter();
   const [users, setUsers] = useState(initialUsers);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -75,7 +67,7 @@ export function UserTable({ users: initialUsers, departments, roles }: Props) {
             placeholder="Search name or email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:border-[#006080] focus:ring-2 focus:ring-[#006080]/10 transition"
+            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/10 transition"
           />
         </div>
 
@@ -167,7 +159,7 @@ export function UserTable({ users: initialUsers, departments, roles }: Props) {
                         href={`/users/${user.id}`}
                         className="flex items-center gap-3 group"
                       >
-                        <div className="relative">
+                        <div className="relative shrink-0">
                           {user.profile_picture ? (
                             <img
                               src={user.profile_picture}
@@ -175,7 +167,7 @@ export function UserTable({ users: initialUsers, departments, roles }: Props) {
                               className="h-9 w-9 rounded-full object-cover ring-2 ring-white shadow-sm"
                             />
                           ) : (
-                            <div className="h-9 w-9 rounded-full bg-[#006080]/10 flex items-center justify-center text-[#006080] font-semibold text-sm ring-2 ring-white shadow-sm">
+                            <div className="h-9 w-9 rounded-full bg-[var(--brand-primary)]/10 flex items-center justify-center text-[var(--brand-primary)] font-semibold text-sm ring-2 ring-white shadow-sm">
                               {user.name.charAt(0).toUpperCase()}
                             </div>
                           )}
@@ -188,7 +180,7 @@ export function UserTable({ users: initialUsers, departments, roles }: Props) {
                           />
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900 group-hover:text-[#006080] transition-colors">
+                          <p className="font-medium text-gray-900 group-hover:text-[var(--brand-primary)] transition-colors">
                             {user.name}
                           </p>
                           {user.nickname && (
@@ -202,11 +194,18 @@ export function UserTable({ users: initialUsers, departments, roles }: Props) {
                     <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                       {user.personal_phone || "—"}
                     </td>
+
+                    {/* Gender — styled text badge instead of Unicode symbol */}
                     <td className="px-4 py-3">
-                      <span className="text-lg" title={user.gender || ""}>
-                        {user.gender ? GENDER_ICONS[user.gender] : "—"}
-                      </span>
+                      {user.gender && GENDER_LABELS[user.gender] ? (
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${GENDER_LABELS[user.gender].color}`}>
+                          {GENDER_LABELS[user.gender].label}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
                     </td>
+
                     <td className="px-4 py-3 text-gray-600">
                       {user.department?.name || "—"}
                     </td>
@@ -215,7 +214,7 @@ export function UserTable({ users: initialUsers, departments, roles }: Props) {
                     </td>
                     <td className="px-4 py-3">
                       {user.type === "Admin" ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#006080]/10 text-[#006080] border border-[#006080]/20">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] border border-[var(--brand-primary)]/20">
                           <ShieldCheck className="h-3 w-3" />
                           Admin
                         </span>
@@ -225,6 +224,8 @@ export function UserTable({ users: initialUsers, departments, roles }: Props) {
                         </span>
                       )}
                     </td>
+
+                    {/* Status toggle — consistent w-11 h-6 */}
                     <td className="px-4 py-3">
                       <button
                         onClick={() => handleToggleStatus(user)}
@@ -233,17 +234,16 @@ export function UserTable({ users: initialUsers, departments, roles }: Props) {
                         aria-label={`Toggle ${user.name} status`}
                       >
                         <div
-                          className={`w-10 h-5.5 rounded-full transition-colors duration-200 flex items-center px-0.5 ${
+                          className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center px-0.5 ${
                             user.status === "Active"
                               ? "bg-emerald-400"
                               : "bg-gray-300"
                           } ${togglingId === user.id ? "opacity-50" : ""}`}
-                          style={{ height: "1.375rem" }}
                         >
                           <div
-                            className={`h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                            className={`h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
                               user.status === "Active"
-                                ? "translate-x-4"
+                                ? "translate-x-5"
                                 : "translate-x-0"
                             }`}
                           />
@@ -286,7 +286,7 @@ function FilterSelect({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label={label}
-        className="appearance-none pl-3 pr-7 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 text-gray-700 focus:outline-none focus:border-[#006080] focus:ring-2 focus:ring-[#006080]/10 transition cursor-pointer"
+        className="appearance-none pl-3 pr-7 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 text-gray-700 focus:outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/10 transition cursor-pointer"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

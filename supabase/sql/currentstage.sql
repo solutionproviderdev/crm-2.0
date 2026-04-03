@@ -1,6 +1,16 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
+CREATE TABLE public.areas (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  district_id uuid NOT NULL,
+  name text NOT NULL,
+  visit_charge numeric NOT NULL DEFAULT 0.00,
+  created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT areas_pkey PRIMARY KEY (id),
+  CONSTRAINT areas_district_id_fkey FOREIGN KEY (district_id) REFERENCES public.districts(id)
+);
 CREATE TABLE public.chat_participants (
   chat_id uuid NOT NULL,
   user_id uuid NOT NULL,
@@ -24,6 +34,22 @@ CREATE TABLE public.departments (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT departments_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.districts (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  division_id uuid NOT NULL,
+  name text NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT districts_pkey PRIMARY KEY (id),
+  CONSTRAINT districts_division_id_fkey FOREIGN KEY (division_id) REFERENCES public.divisions(id)
+);
+CREATE TABLE public.divisions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT divisions_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.lead_call_logs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

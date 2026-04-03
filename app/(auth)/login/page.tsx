@@ -73,7 +73,7 @@ export default function LoginPage() {
 
         {/* Bottom tag */}
         <div className="absolute bottom-6 text-white/40 text-xs">
-          © {new Date().getFullYear()} Solution Provider. All rights reserved.
+          © 2026 Solution Provider. All rights reserved.
         </div>
       </div>
 

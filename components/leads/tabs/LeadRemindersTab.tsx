@@ -16,7 +16,7 @@ interface LeadRemindersTabProps {
 export function LeadRemindersTab({ lead }: LeadRemindersTabProps) {
   // Reminders are often stored in lead_follow_ups with type='Reminder' 
   // or a dedicated structure. For now, we'll filter follow_ups.
-  const reminders = lead.follow_ups?.filter(f => f.type === "Reminder") || [];
+  const reminders = lead.follow_ups?.filter(f => (f.type as string) === "Reminder") || [];
 
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {

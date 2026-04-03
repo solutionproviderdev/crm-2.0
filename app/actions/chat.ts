@@ -57,7 +57,14 @@ export async function getContactableUsers() {
     console.error("fetchContactableUsers error:", error.message);
     return { success: false, error: error.message };
   }
-  return { success: true, data: (data || []) as ContactableUser[] };
+  const parsedData = (data || []).map((u: any) => ({
+    id: u.id,
+    name: u.name,
+    profile_picture: u.profile_picture,
+    department: Array.isArray(u.department) ? u.department[0] : u.department
+  }));
+
+  return { success: true, data: parsedData as unknown as ContactableUser[] };
 }
 
 /**
@@ -95,7 +102,7 @@ export async function getMyChats() {
   if (error) return { success: false, error: error.message };
 
   // Transform data to make it easier to digest on frontend
-  const formattedChats: ChatSidebarItem[] = ((data || []) as ChatListRow[]).map((cp) => {
+  const formattedChats: ChatSidebarItem[] = ((data || []) as unknown as ChatListRow[]).map((cp) => {
     // Other participants in the chat
     const others = cp.chats.participants
       .filter((participant) => participant.user?.id !== user.id)
@@ -172,7 +179,7 @@ export async function startDirectChat(targetUserId: string) {
     return { success: false, error: myDirectChatsError.message };
   }
 
-  const existingDirectChat = (myDirectChats as DirectChatLookupRow[] | null)?.find((entry) => {
+  const existingDirectChat = (myDirectChats as unknown as DirectChatLookupRow[] | null)?.find((entry) => {
     const participants = entry.chats?.participants?.map((participant) => participant.user_id) || [];
     return participants.length === 2 && participants.includes(user.id) && participants.includes(targetUserId);
   });

@@ -81,14 +81,14 @@ export function LeadFilters({ statuses, sources, users }: LeadFiltersProps) {
             onClick={handleSearch}
             className="absolute left-3 top-1/2 -translate-y-1/2 h-8 w-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors z-10"
           >
-            <Search className="h-4 w-4 text-gray-400 group-hover/search:text-[var(--brand-primary)]" />
+            <Search className="h-4 w-4 text-gray-400 group-hover/search:text-(--brand-primary)" />
           </button>
           <Input
             placeholder="Search by name, phone, CID or address..."
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="pl-11 pr-10 h-10 border-gray-200 rounded-xl focus:ring-[var(--brand-primary)]/10 focus:border-[var(--brand-primary)]/30 transition-all font-bold placeholder:text-gray-400"
+            className="pl-11 pr-10 h-10 border-gray-200 rounded-xl focus:ring-(--brand-primary)/10 focus:border-(--brand-primary)/30 transition-all font-bold placeholder:text-gray-400"
           />
           {localSearch && (
             <button

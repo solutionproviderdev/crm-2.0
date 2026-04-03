@@ -7,10 +7,27 @@ import { LeadTable } from "./LeadTable";
 import { LeadFilters } from "./LeadFilters";
 import { LeadStatusChart } from "./LeadStatusChart";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, List, BarChart3, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { 
+  LayoutGrid, 
+  List, 
+  BarChart3, 
+  Users, 
+  Download, 
+  FileText, 
+  Table as TableIcon 
+} from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useQueryState, parseAsInteger, parseAsString } from "nuqs";
 import { CreateLeadDialog } from "./CreateLeadDialog";
+import { BatchLeadImportDialog } from "./BatchLeadImportDialog";
+import { LeadPagination } from "./LeadPagination";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { downloadSampleCSV, downloadSampleXLSX } from "@/lib/lead-import-utils";
 
 interface LeadsPageContentProps {
   initialData: {
@@ -52,8 +69,8 @@ export function LeadsPageContent({ initialData, users }: LeadsPageContentProps) 
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="bg-[var(--brand-primary)]/10 p-2.5 rounded-xl border border-[var(--brand-primary)]/20">
-            <Users className="h-6 w-6 text-[var(--brand-primary)]" />
+          <div className="bg-(--brand-primary)/10 p-2.5 rounded-xl border border-(--brand-primary)/20">
+            <Users className="h-6 w-6 text-(--brand-primary)" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Lead Management</h1>
@@ -64,6 +81,33 @@ export function LeadsPageContent({ initialData, users }: LeadsPageContentProps) 
         </div>
 
         <div className="flex items-center gap-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2 border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold shadow-sm">
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Sample Format</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 rounded-xl p-1 shadow-xl border-gray-100">
+              <DropdownMenuItem 
+                onClick={downloadSampleCSV}
+                className="gap-2 py-2.5 cursor-pointer rounded-lg font-medium"
+              >
+                <FileText className="h-4 w-4 text-gray-400" />
+                Sample CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={downloadSampleXLSX}
+                className="gap-2 py-2.5 cursor-pointer rounded-lg font-medium"
+              >
+                <TableIcon className="h-4 w-4 text-green-500" />
+                Sample XLSX
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <BatchLeadImportDialog users={users} />
+          
           <CreateLeadDialog users={users} />
           
           <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-xl border border-gray-200">
@@ -73,20 +117,20 @@ export function LeadsPageContent({ initialData, users }: LeadsPageContentProps) 
               onClick={() => setShowChart(!showChart)}
               className={cn(
                 "h-8 gap-2 px-3 rounded-lg text-xs font-bold transition-all",
-                showChart ? "bg-white text-[var(--brand-primary)] shadow-sm" : "text-gray-500 hover:text-gray-700"
+                showChart ? "bg-white text-(--brand-primary) shadow-sm" : "text-gray-500 hover:text-gray-700"
               )}
             >
-              <BarChart3 className={cn("h-3.5 w-3.5", showChart ? "text-[var(--brand-primary)]" : "text-gray-400")} />
+              <BarChart3 className={cn("h-3.5 w-3.5", showChart ? "text-(--brand-primary)" : "text-gray-400")} />
                Analytics
             </Button>
-            <div className="w-[1px] h-4 bg-gray-200 mx-1" />
+            <div className="w-px h-4 bg-gray-200 mx-1" />
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setView("grid")}
               className={cn(
                 "h-8 w-8 p-0 rounded-lg transition-all",
-                view === "grid" ? "bg-white text-[var(--brand-primary)] shadow-sm" : "text-gray-500 hover:text-gray-700"
+                view === "grid" ? "bg-white text-(--brand-primary) shadow-sm" : "text-gray-500 hover:text-gray-700"
               )}
             >
               <LayoutGrid className="h-4 w-4" />
@@ -97,7 +141,7 @@ export function LeadsPageContent({ initialData, users }: LeadsPageContentProps) 
               onClick={() => setView("table")}
               className={cn(
                 "h-8 w-8 p-0 rounded-lg transition-all",
-                view === "table" ? "bg-white text-[var(--brand-primary)] shadow-sm" : "text-gray-500 hover:text-gray-700"
+                view === "table" ? "bg-white text-(--brand-primary) shadow-sm" : "text-gray-500 hover:text-gray-700"
               )}
             >
               <List className="h-4 w-4" />
@@ -112,6 +156,13 @@ export function LeadsPageContent({ initialData, users }: LeadsPageContentProps) 
         statuses={initialData.filters.statuses} 
         sources={initialData.filters.sources}
         users={users}
+      />
+
+      <LeadPagination 
+        page={page} 
+        totalPages={initialData.totalPages} 
+        onPageChange={setPage} 
+        className="mb-2"
       />
 
       {view === "grid" ? (
@@ -135,34 +186,12 @@ export function LeadsPageContent({ initialData, users }: LeadsPageContentProps) 
         />
       )}
 
-      {/* Pagination */}
-      {initialData.totalPages > 1 && (
-        <div className="flex items-center justify-between pt-6 border-t border-gray-100">
-          <p className="text-sm text-gray-500 font-medium">
-            Page {page} of {initialData.totalPages}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage(page - 1)}
-              className="h-9 w-9 p-0 rounded-lg border-gray-200 hover:bg-gray-50 text-[var(--brand-primary)] disabled:text-gray-300"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= initialData.totalPages}
-              onClick={() => setPage(page + 1)}
-              className="h-9 w-9 p-0 rounded-lg border-gray-200 hover:bg-gray-50 text-[var(--brand-primary)] disabled:text-gray-300"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+      <LeadPagination 
+        page={page} 
+        totalPages={initialData.totalPages} 
+        onPageChange={setPage} 
+        className="pt-6 border-t border-gray-100"
+      />
     </div>
   );
 }

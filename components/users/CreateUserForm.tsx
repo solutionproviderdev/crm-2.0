@@ -11,6 +11,11 @@ interface Props {
   roles: Role[];
 }
 
+// Shared field label & input classes (Tailwind — no inline <style> block)
+const fieldLabel = "block text-[0.8125rem] font-medium text-gray-700 mb-1.5";
+const fieldInput =
+  "block w-full px-3 py-2 border border-gray-200 rounded-[0.625rem] text-sm bg-gray-50 text-gray-900 outline-none transition-all duration-150 placeholder:text-gray-400 focus:border-[var(--brand-primary)] focus:bg-white focus:ring-2 focus:ring-[var(--brand-primary)]/10";
+
 export function CreateUserForm({ departments, roles }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -88,22 +93,22 @@ export function CreateUserForm({ departments, roles }: Props) {
           description="Basic details about the user"
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField label="Full Name (as per NID)" name="name" required placeholder="Abdullah Al Mamun" />
-            <FormField label="Nickname / Display Name" name="nickname" placeholder="Mamun" />
-            <FormField label="Personal Phone" name="personal_phone" type="tel" placeholder="+880 1XXXXXXXXX" />
-            <FormField label="Office Phone"   name="office_phone"   type="tel" placeholder="+880 1XXXXXXXXX" />
+            <FormField label="Full Name (as per NID)" name="name" required placeholder="Abdullah Al Mamun" fieldLabel={fieldLabel} fieldInput={fieldInput} />
+            <FormField label="Nickname / Display Name" name="nickname" placeholder="Mamun" fieldLabel={fieldLabel} fieldInput={fieldInput} />
+            <FormField label="Personal Phone" name="personal_phone" type="tel" placeholder="+880 1XXXXXXXXX" fieldLabel={fieldLabel} fieldInput={fieldInput} />
+            <FormField label="Office Phone"   name="office_phone"   type="tel" placeholder="+880 1XXXXXXXXX" fieldLabel={fieldLabel} fieldInput={fieldInput} />
             <div>
-              <label className="field-label">Gender</label>
-              <select name="gender" className="field-input">
+              <label className={fieldLabel}>Gender</label>
+              <select name="gender" className={fieldInput}>
                 <option value="">Select gender</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
                 <option value="Other">Other</option>
               </select>
             </div>
-            <FormField label="Date of Birth" name="date_of_birth" type="date" />
+            <FormField label="Date of Birth" name="date_of_birth" type="date" fieldLabel={fieldLabel} fieldInput={fieldInput} />
           </div>
-          <FormField label="Address" name="address" placeholder="House, Road, Area, City" />
+          <FormField label="Address" name="address" placeholder="House, Road, Area, City" fieldLabel={fieldLabel} fieldInput={fieldInput} />
         </FormSection>
 
         {/* ── Section: Account ───────────────────────────── */}
@@ -113,11 +118,11 @@ export function CreateUserForm({ departments, roles }: Props) {
           description="Login email and password for this user"
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField label="Email Address" name="email" type="email" required placeholder="user@example.com" />
-            <FormField label="Password"      name="password" type="password" required placeholder="Min 8 characters" />
+            <FormField label="Email Address" name="email" type="email" required placeholder="user@example.com" fieldLabel={fieldLabel} fieldInput={fieldInput} />
+            <FormField label="Password"      name="password" type="password" required placeholder="Min 8 characters" fieldLabel={fieldLabel} fieldInput={fieldInput} />
             <div>
-              <label className="field-label">Account Type</label>
-              <select name="type" className="field-input" required>
+              <label className={fieldLabel}>Account Type</label>
+              <select name="type" className={fieldInput} required>
                 <option value="Operator">Operator (Standard)</option>
                 <option value="Admin">Admin (Full Access)</option>
               </select>
@@ -133,10 +138,10 @@ export function CreateUserForm({ departments, roles }: Props) {
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="field-label">Department</label>
+              <label className={fieldLabel}>Department</label>
               <select
                 name="department_id"
-                className="field-input"
+                className={fieldInput}
                 value={selectedDept}
                 onChange={(e) => setSelectedDept(e.target.value)}
               >
@@ -147,24 +152,24 @@ export function CreateUserForm({ departments, roles }: Props) {
               </select>
             </div>
             <div>
-              <label className="field-label">Role</label>
-              <select name="role_id" className="field-input">
+              <label className={fieldLabel}>Role</label>
+              <select name="role_id" className={fieldInput}>
                 <option value="">— No role —</option>
                 {filteredRoles.map((r) => (
                   <option key={r.id} value={r.id}>{r.name}</option>
                 ))}
               </select>
             </div>
-            <FormField label="Joining Date" name="joining_date" type="date" />
-            <FormField label="Current Salary (৳)" name="current_salary" type="number" placeholder="0.00" />
+            <FormField label="Joining Date" name="joining_date" type="date" fieldLabel={fieldLabel} fieldInput={fieldInput} />
+            <FormField label="Current Salary (৳)" name="current_salary" type="number" placeholder="0.00" fieldLabel={fieldLabel} fieldInput={fieldInput} />
           </div>
           <div>
-            <label className="field-label">Working Procedure / Notes</label>
+            <label className={fieldLabel}>Working Procedure / Notes</label>
             <textarea
               name="working_procedure"
               rows={3}
               placeholder="Describe the working procedure or any notes..."
-              className="field-input resize-none"
+              className={`${fieldInput} resize-none`}
             />
           </div>
         </FormSection>
@@ -176,9 +181,9 @@ export function CreateUserForm({ departments, roles }: Props) {
           description="Emergency contact details"
         >
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <FormField label="Guardian Name"     name="guardian_name"     placeholder="Full Name" />
-            <FormField label="Guardian Phone"    name="guardian_phone"    type="tel" placeholder="+880 1XXXXXXXXX" />
-            <FormField label="Relation"          name="guardian_relation" placeholder="Father / Mother / Spouse" />
+            <FormField label="Guardian Name"  name="guardian_name"     placeholder="Full Name" fieldLabel={fieldLabel} fieldInput={fieldInput} />
+            <FormField label="Guardian Phone" name="guardian_phone"    type="tel" placeholder="+880 1XXXXXXXXX" fieldLabel={fieldLabel} fieldInput={fieldInput} />
+            <FormField label="Relation"       name="guardian_relation" placeholder="Father / Mother / Spouse" fieldLabel={fieldLabel} fieldInput={fieldInput} />
           </div>
         </FormSection>
 
@@ -188,7 +193,11 @@ export function CreateUserForm({ departments, roles }: Props) {
             type="submit"
             disabled={isPending}
             id="create-user-submit"
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#006080] text-white font-semibold text-sm shadow-lg shadow-[#006080]/20 hover:bg-[#005070] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-semibold text-sm shadow-lg disabled:opacity-60 disabled:cursor-not-allowed transition-all hover:opacity-90"
+            style={{
+              background: "var(--brand-primary)",
+              boxShadow: "0 4px 14px color-mix(in srgb, var(--brand-primary) 30%, transparent)",
+            }}
           >
             {isPending ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Creating...</>
@@ -205,21 +214,6 @@ export function CreateUserForm({ departments, roles }: Props) {
           </button>
         </div>
       </form>
-
-      <style>{`
-        .field-label { display: block; font-size: 0.8125rem; font-weight: 500; color: #374151; margin-bottom: 0.375rem; }
-        .field-input {
-          display: block; width: 100%; padding: 0.5rem 0.75rem;
-          border: 1px solid #e5e7eb; border-radius: 0.625rem; font-size: 0.875rem;
-          background: #f9fafb; color: #111827; outline: none;
-          transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
-        }
-        .field-input:focus {
-          border-color: #006080; background: #fff;
-          box-shadow: 0 0 0 3px rgba(0,96,128,0.08);
-        }
-        .field-input::placeholder { color: #9ca3af; }
-      `}</style>
     </div>
   );
 }
@@ -238,8 +232,11 @@ function FormSection({
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-50 flex items-center gap-3">
-        <div className="h-9 w-9 rounded-xl bg-[#006080]/10 flex items-center justify-center">
-          <Icon className="h-4.5 w-4.5 text-[#006080]" />
+        <div
+          className="h-9 w-9 rounded-xl flex items-center justify-center"
+          style={{ background: "var(--brand-primary-light)" }}
+        >
+          <Icon className="h-4 w-4" style={{ color: "var(--brand-primary)" }} />
         </div>
         <div>
           <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
@@ -257,16 +254,20 @@ function FormField({
   type = "text",
   required,
   placeholder,
+  fieldLabel: labelClass,
+  fieldInput: inputClass,
 }: {
   label: string;
   name: string;
   type?: string;
   required?: boolean;
   placeholder?: string;
+  fieldLabel: string;
+  fieldInput: string;
 }) {
   return (
     <div>
-      <label htmlFor={name} className="field-label">
+      <label htmlFor={name} className={labelClass}>
         {label}
         {required && <span className="text-red-400 ml-0.5">*</span>}
       </label>
@@ -276,7 +277,7 @@ function FormField({
         type={type}
         required={required}
         placeholder={placeholder}
-        className="field-input"
+        className={inputClass}
       />
     </div>
   );

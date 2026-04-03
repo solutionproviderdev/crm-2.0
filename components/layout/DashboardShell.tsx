@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LayoutDashboard, Users, Bell, MessagesSquare, CalendarDays } from 'lucide-react';
+import { LayoutDashboard, Users, Bell, MessagesSquare, CalendarDays, Wrench } from 'lucide-react';
 import { logout } from '@/app/actions/auth';
 import type { User } from '@/lib/types';
 import type { PermissionMap } from '@/lib/permissions';
@@ -25,6 +25,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
 	{ name: 'Meetings', href: '/meetings/slots', icon: CalendarDays },
 	{ name: 'Users', href: '/users', icon: Users },
 	{ name: 'Chat', href: '/chat', icon: MessagesSquare },
+	{ name: 'Utility', href: '/utility/map', icon: Wrench },
 ];
 
 interface Props {
@@ -70,7 +71,7 @@ export function DashboardShell({ user, settings, children }: Props) {
 	}
 
 	return (
-		<div className="flex flex-col min-h-screen bg-[#f8fafc] w-full">
+		<div className="flex flex-col h-dvh overflow-hidden bg-[#f8fafc] w-full">
 			{/* ── Top Navbar ─────────────────────────────── */}
 			<TopNavbar
 				user={user}
@@ -81,10 +82,10 @@ export function DashboardShell({ user, settings, children }: Props) {
 			/>
 
 			{/* ── Main content ────────────────────────────── */}
-			<div className="flex flex-1 flex-col w-full">
+			<div className="flex flex-1 min-h-0 flex-col w-full">
 				<UserProvider initialUser={user}>
 					{/* Page content */}
-					<main className="flex-1 w-full h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
+					<main className="flex-1 min-h-0 w-full flex flex-col overflow-y-auto">
 						{children}
 					</main>
 				</UserProvider>

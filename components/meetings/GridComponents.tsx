@@ -112,7 +112,7 @@ export function DraggableMeeting({ id, meeting }: DraggableMeetingProps) {
         >
           <MeetingStatusMenu
             meeting={meeting}
-            onUpdate={(updated) => setMeeting((prev) => ({ ...prev, ...updated }))}
+            onUpdate={() => {}}
             stopPropagation
           />
         </div>

@@ -181,7 +181,7 @@ export interface ChatSidebarItem {
 }
 // ── Lead Management Types ──────────────────────────────────────────────────
 
-export type LeadSource = "Facebook" | "WhatsApp" | "Web" | "Phone";
+export type LeadSource = "Facebook" | "WhatsApp" | "Website" | "Referral" | "Instagram" | "Phone";
 
 export interface Lead {
   id: string;

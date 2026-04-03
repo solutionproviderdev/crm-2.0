@@ -90,13 +90,13 @@ export function CreateLeadDialog({ users }: CreateLeadDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-[var(--brand-primary)] hover:bg-[#035170] shadow-lg shadow-[var(--brand-primary)]/20 gap-2 h-10 px-5 rounded-xl font-bold transition-all">
+        <Button className="bg-(--brand-primary) hover:bg-[#035170] shadow-lg shadow-(--brand-primary)/20 gap-2 h-10 px-5 rounded-xl font-bold transition-all">
           <Plus className="h-4 w-4" />
           Create Lead
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] border-none shadow-2xl rounded-2xl p-0 overflow-hidden">
-        <DialogHeader className="bg-[var(--brand-primary)] p-6 text-white">
+      <DialogContent className="sm:max-w-125 border-none shadow-2xl rounded-2xl p-0 overflow-hidden">
+        <DialogHeader className="bg-(--brand-primary) p-6 text-white">
           <DialogTitle className="text-xl font-bold">New Prospect Lead</DialogTitle>
           <p className="text-white/70 text-xs mt-1">
             Fill in the details to add a new lead to the CRM
@@ -111,7 +111,7 @@ export function CreateLeadDialog({ users }: CreateLeadDialogProps) {
                 id="name" 
                 {...register("name", { required: true })} 
                 placeholder="Client Name"
-                className="h-11 rounded-lg border-gray-200 focus:ring-[var(--brand-primary)]/20 focus:border-[var(--brand-primary)]/50" 
+                className="h-11 rounded-lg border-gray-200 focus:ring-(--brand-primary)/20 focus:border-(--brand-primary)/50" 
               />
             </div>
 
@@ -122,7 +122,7 @@ export function CreateLeadDialog({ users }: CreateLeadDialogProps) {
                   id="phone" 
                   {...register("phone")} 
                   placeholder="e.g. +880..."
-                  className="h-11 rounded-lg border-gray-200 focus:ring-[var(--brand-primary)]/20 focus:border-[var(--brand-primary)]/50"
+                  className="h-11 rounded-lg border-gray-200 focus:ring-(--brand-primary)/20 focus:border-(--brand-primary)/50"
                 />
               </div>
 
@@ -135,7 +135,9 @@ export function CreateLeadDialog({ users }: CreateLeadDialogProps) {
                   <SelectContent>
                     <SelectItem value="Facebook">Facebook</SelectItem>
                     <SelectItem value="WhatsApp">WhatsApp</SelectItem>
-                    <SelectItem value="Web">Website</SelectItem>
+                    <SelectItem value="Website">Website</SelectItem>
+                    <SelectItem value="Referral">Referral</SelectItem>
+                    <SelectItem value="Instagram">Instagram</SelectItem>
                     <SelectItem value="Phone">Phone / Direct</SelectItem>
                   </SelectContent>
                 </Select>
@@ -179,7 +181,7 @@ export function CreateLeadDialog({ users }: CreateLeadDialogProps) {
             <Button 
               type="submit" 
               disabled={loading}
-              className="h-11 rounded-xl bg-[var(--brand-primary)] hover:bg-[#035170] min-w-[120px]"
+              className="h-11 rounded-xl bg-(--brand-primary) hover:bg-[#035170] min-w-30"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Lead"}
             </Button>

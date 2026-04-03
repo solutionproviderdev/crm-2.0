@@ -2,13 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Users,
-  UserPlus,
-  Building2,
-  ShieldCheck,
-  ChevronRight,
-} from "lucide-react";
+import { Map, ChevronRight } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
@@ -17,13 +11,9 @@ import type { PermissionMap } from "@/lib/permissions";
 import { isRouteAllowed } from "@/lib/permissions";
 
 const MODULE_NAV_ITEMS = [
-  { name: "All Users",   href: "/users",             icon: Users },
-  { name: "Create User", href: "/users/new",         icon: UserPlus },
-  { name: "Departments", href: "/users/departments", icon: Building2 },
-  { name: "Roles",       href: "/users/roles",       icon: ShieldCheck },
+  { name: "Map Data", href: "/utility/map", icon: Map },
 ];
 
-// Skeleton sidebar shown while user session is loading
 function SidebarSkeleton() {
   return (
     <div className="w-full md:w-64 shrink-0 bg-white border-r border-gray-100 flex flex-col">
@@ -31,7 +21,7 @@ function SidebarSkeleton() {
         <div className="h-3 w-24 bg-gray-200 rounded-full animate-pulse" />
       </div>
       <nav className="p-2 space-y-1">
-        {[...Array(4)].map((_, i) => (
+        {[...Array(2)].map((_, i) => (
           <div
             key={i}
             className="h-10 rounded-xl bg-gray-100 animate-pulse"
@@ -43,7 +33,7 @@ function SidebarSkeleton() {
   );
 }
 
-export default function UserModuleLayout({
+export default function UtilityModuleLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -51,30 +41,29 @@ export default function UserModuleLayout({
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const supabase = useState(() => createClient())[0];
 
   useEffect(() => {
     async function fetchUser() {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
         const { data } = await supabase
           .from("users")
           .select("*, role:roles(*)")
-          .eq("id", authUser.id)
+          .eq("id", session.user.id)
           .single();
         setUser(data);
       }
       setLoading(false);
     }
     fetchUser();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [supabase]);
 
   const isAdmin = user?.type === "Admin";
   const permissions = (user?.role?.permissions ?? {}) as PermissionMap;
 
   const visibleItems = loading
-    ? MODULE_NAV_ITEMS // show all while loading (skeleton hides them anyway)
+    ? MODULE_NAV_ITEMS
     : MODULE_NAV_ITEMS.filter((item) =>
         isRouteAllowed(item.href, permissions, isAdmin)
       );
@@ -88,15 +77,12 @@ export default function UserModuleLayout({
         <aside className="w-full md:w-64 shrink-0 bg-white border-r border-gray-100 overflow-y-auto">
           <div className="sticky top-0 z-10 px-4 py-4 border-b border-gray-100 bg-white">
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-              User Module
+              Utility
             </h3>
           </div>
           <nav className="p-2 space-y-0.5">
             {visibleItems.map((item) => {
-              const isActive =
-                item.href === "/users"
-                  ? pathname === "/users"
-                  : pathname.startsWith(item.href);
+              const isActive = pathname.startsWith(item.href);
 
               return (
                 <Link
@@ -110,7 +96,6 @@ export default function UserModuleLayout({
                   )}
                 >
                   <div className="flex items-center gap-3">
-                    {/* Left accent indicator */}
                     <span
                       className={cn(
                         "h-5 w-0.5 rounded-full transition-all duration-150 shrink-0",
@@ -136,7 +121,7 @@ export default function UserModuleLayout({
       )}
 
       {/* ── Content Area ───────────────────────────── */}
-      <div className="flex-1 min-w-0 p-4 md:p-6 lg:p-8 overflow-y-auto bg-[#f8fafc] h-[calc(100vh-4rem)]">
+      <div className="flex-1 min-w-0 p-4 md:p-6 lg:p-8 overflow-hidden flex flex-col bg-[#f8fafc] h-[calc(100vh-64px)]">
         {children}
       </div>
     </div>

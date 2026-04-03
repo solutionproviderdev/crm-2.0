@@ -28,6 +28,10 @@ export const ALL_PERMISSIONS = [
     resource: "Reports",
     actions: ["Sales Report", "Lead Report", "Finance Report"],
   },
+  {
+    resource: "Utility",
+    actions: ["Map Data"],
+  },
 ] as const;
 
 export type PermissionResource = (typeof ALL_PERMISSIONS)[number]["resource"];
@@ -52,6 +56,7 @@ export const PERMISSION_ROUTE_MAP: Record<string, string> = {
   "Reports:Sales Report":   "/dashboard/reports/sales",
   "Reports:Lead Report":    "/dashboard/reports/leads",
   "Reports:Finance Report": "/dashboard/reports/finance",
+  "Utility:Map Data":       "/utility/map",
 };
 
 /** Build a flat set of allowed route prefixes from a permissions map */

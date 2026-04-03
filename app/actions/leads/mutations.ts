@@ -297,3 +297,34 @@ export async function updateLeadProjectStatus(
 
   return { success: true, data: true };
 }
+/**
+ * Bulk-creates multiple lead records in a single transaction.
+ *
+ * @param leads - Array of lead creation inputs
+ */
+export async function createLeadsBulk(
+  leads: CreateLeadInput[]
+): Promise<ActionResult<{ inserted: number; failed: number }>> {
+  if (!leads.length) return { success: false, error: "No leads to import" };
+
+  const supabase = await getUserClient();
+
+  const { data, error } = await supabase
+    .from("leads")
+    .insert(leads)
+    .select();
+
+  if (error) return { success: false, error: error.message };
+
+  updateTag(CACHE_TAGS.LEADS);
+  updateTag(CACHE_TAGS.LEAD_STATUS_COUNTS);
+  revalidatePath("/leads");
+
+  return { 
+    success: true, 
+    data: { 
+      inserted: data?.length || 0, 
+      failed: leads.length - (data?.length || 0) 
+    } 
+  };
+}

@@ -13,9 +13,9 @@ import {
   DollarSign,
   Shield,
   FileText,
-  Edit,
   ArrowLeft,
   ShieldCheck,
+  Pencil,
 } from "lucide-react";
 import type { User } from "@/lib/types";
 import { updateUserStatus } from "@/app/actions/users";
@@ -60,7 +60,12 @@ export function UserProfileClient({ user: initialUser }: Props) {
       </button>
 
       {/* ── Cover + Avatar Header ──────────────────────────── */}
-      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-[#006080] to-[#003d52] h-44 mb-16">
+      <div
+        className="relative rounded-2xl overflow-hidden h-44 mb-16"
+        style={{
+          background: `linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%)`,
+        }}
+      >
         {user.cover_photo && (
           <img
             src={user.cover_photo}
@@ -96,7 +101,10 @@ export function UserProfileClient({ user: initialUser }: Props) {
               className="h-24 w-24 rounded-2xl border-4 border-white shadow-xl object-cover"
             />
           ) : (
-            <div className="h-24 w-24 rounded-2xl border-4 border-white shadow-xl bg-[#006080] flex items-center justify-center text-white text-3xl font-black">
+            <div
+              className="h-24 w-24 rounded-2xl border-4 border-white shadow-xl flex items-center justify-center text-white text-3xl font-black"
+              style={{ background: "var(--brand-primary)" }}
+            >
               {user.name.charAt(0)}
             </div>
           )}
@@ -116,7 +124,14 @@ export function UserProfileClient({ user: initialUser }: Props) {
               )}
             </h1>
             {user.type === "Admin" && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-[#006080]/10 text-[#006080] border border-[#006080]/20">
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border"
+                style={{
+                  background: "var(--brand-primary-light)",
+                  color: "var(--brand-primary)",
+                  borderColor: `color-mix(in srgb, var(--brand-primary) 30%, transparent)`,
+                }}
+              >
                 <ShieldCheck className="h-3 w-3" /> Admin
               </span>
             )}
@@ -140,6 +155,7 @@ export function UserProfileClient({ user: initialUser }: Props) {
               className={`relative w-11 h-6 rounded-full transition-colors duration-200 flex items-center px-0.5 ${
                 user.status === "Active" ? "bg-emerald-400" : "bg-gray-200"
               } disabled:opacity-50`}
+              aria-label="Toggle user status"
             >
               <span
                 className={`h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
@@ -148,26 +164,38 @@ export function UserProfileClient({ user: initialUser }: Props) {
               />
             </button>
           </div>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-            <Edit className="h-3.5 w-3.5" /> Edit
+          {/* Edit — marked as coming soon until edit page is built */}
+          <button
+            disabled
+            title="Edit profile — coming soon"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-400 cursor-not-allowed select-none"
+          >
+            <Pencil className="h-3.5 w-3.5" /> Edit
           </button>
         </div>
       </div>
 
       {/* ── Tabs ─────────────────────────────────────────── */}
       <div className="border-b border-gray-100 mb-6">
-        <nav className="flex gap-1 px-1">
+        <nav className="flex gap-0 px-1">
           {TABS.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors ${
+              className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
                 activeTab === tab
-                  ? "text-[#006080] border-b-2 border-[#006080] bg-[#006080]/5"
+                  ? "text-[var(--brand-primary)]"
                   : "text-gray-400 hover:text-gray-700"
               }`}
             >
               {tab}
+              {/* Active underline using pseudo-absolute bar, overlapping parent border correctly */}
+              {activeTab === tab && (
+                <span
+                  className="absolute bottom-[-1px] left-0 right-0 h-0.5 rounded-full"
+                  style={{ background: "var(--brand-primary)" }}
+                />
+              )}
             </button>
           ))}
         </nav>
@@ -280,7 +308,7 @@ function AccessRoleTab({ user }: { user: User }) {
     <div className="space-y-4">
       <SectionTitle>
         Permissions via{" "}
-        <span className="text-[#006080]">{user.role?.name ?? "No Role"}</span>
+        <span style={{ color: "var(--brand-primary)" }}>{user.role?.name ?? "No Role"}</span>
       </SectionTitle>
 
       {user.role ? (
@@ -325,13 +353,16 @@ function DocumentsTab({ user }: { user: User }) {
               href={doc.storage_path}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-[#006080]/30 hover:bg-[#006080]/5 transition-colors group"
+              className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-[var(--brand-primary)]/30 hover:bg-[var(--brand-primary)]/5 transition-colors group"
             >
-              <div className="h-9 w-9 rounded-lg bg-[#006080]/10 flex items-center justify-center shrink-0">
-                <FileText className="h-4 w-4 text-[#006080]" />
+              <div
+                className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0"
+                style={{ background: "var(--brand-primary-light)" }}
+              >
+                <FileText className="h-4 w-4" style={{ color: "var(--brand-primary)" }} />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-900 group-hover:text-[#006080]">
+                <p className="text-sm font-medium text-gray-900 group-hover:text-[var(--brand-primary)]">
                   {doc.label || docLabels[doc.type] || doc.type}
                 </p>
                 <p className="text-xs text-gray-400">View document</p>

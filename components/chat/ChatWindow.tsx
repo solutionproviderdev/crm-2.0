@@ -3,7 +3,7 @@
 import { KeyboardEvent, useEffect, useRef, useState, useTransition } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { markChatAsRead, sendMessage } from "@/app/actions/chat";
-import { ArrowLeft, MoreVertical, Phone, Send, Video } from "lucide-react";
+import { ArrowLeft, Send } from "lucide-react";
 import { format, isSameDay } from "date-fns";
 import { cn } from "@/utils/cn";
 import { useRouter } from "next/navigation";
@@ -13,12 +13,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import type { ChatMessage, ChatUser } from "@/lib/types";
 
-export function ChatWindow({ 
-  chatId, 
+export function ChatWindow({
+  chatId,
   currentUserId,
   otherUser,
-  initialMessages 
-}: { 
+  initialMessages
+}: {
   chatId: string;
   currentUserId: string;
   otherUser: ChatUser;
@@ -52,9 +52,9 @@ export function ChatWindow({
       .channel(`chat_room_${chatId}`)
       .on(
         "postgres_changes",
-        { 
-          event: "INSERT", 
-          schema: "public", 
+        {
+          event: "INSERT",
+          schema: "public",
           table: "messages",
           filter: `chat_id=eq.${chatId}`
         },
@@ -71,7 +71,6 @@ export function ChatWindow({
               if (prev.some((message) => message.id === newMsg.id)) {
                 return prev;
               }
-
               return [
                 ...prev,
                 {
@@ -126,10 +125,9 @@ export function ChatWindow({
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#f8fafc]">
-      {/* Header */}
+    <div className="flex flex-col h-full bg-[#f8fafc] overflow-hidden">
+      {/* ── Header ── */}
       <div className="shrink-0 border-b border-[var(--brand-primary)]/10 bg-white px-4 py-3 shadow-sm z-10 relative md:px-6">
-        <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Button
             type="button"
@@ -150,29 +148,33 @@ export function ChatWindow({
           <div>
             <h2 className="text-sm font-bold text-gray-900">{otherUser.name}</h2>
             <p className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-gray-500">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--brand-primary)]/35" />
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
               Direct conversation
             </p>
           </div>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <button type="button" title="Voice calling coming soon" disabled className="flex h-9 w-9 items-center justify-center rounded-full text-gray-300 transition-colors disabled:cursor-not-allowed">
-            <Phone className="h-4 w-4" />
-          </button>
-          <button type="button" title="Video calling coming soon" disabled className="flex h-9 w-9 items-center justify-center rounded-full text-gray-300 transition-colors disabled:cursor-not-allowed">
-            <Video className="h-4 w-4" />
-          </button>
-          <div className="w-px h-5 bg-gray-200 mx-1" />
-          <button type="button" title="More actions coming soon" disabled className="flex h-9 w-9 items-center justify-center rounded-full text-gray-300 transition-colors disabled:cursor-not-allowed">
-            <MoreVertical className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
       </div>
 
-      {/* Messages View */}
+      {/* ── Messages View ── */}
       <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">
+        {/* Empty state for fresh conversations */}
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-center pb-8">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-[var(--brand-primary)]/10">
+              <Avatar className="h-12 w-12">
+                <AvatarImage src={otherUser?.profile_picture || undefined} alt={otherUser.name} />
+                <AvatarFallback className="bg-gradient-to-br from-[var(--brand-primary)] to-[#0a8cb3] text-sm font-bold text-white">
+                  {otherUser.name.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            </div>
+            <h3 className="text-base font-semibold text-gray-900">{otherUser.name}</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              This is the beginning of your conversation. Say hello! 👋
+            </p>
+          </div>
+        )}
+
         {messages.map((msg, index) => {
           const isMe = msg.sender.id === currentUserId;
           const prevMsg = index > 0 ? messages[index - 1] : null;
@@ -242,9 +244,9 @@ export function ChatWindow({
         <div ref={bottomRef} className="h-6" />
       </div>
 
-      {/* Input Area */}
-      <div className="shrink-0 border-t border-[var(--brand-primary)]/10 bg-white p-4">
-        <form 
+      {/* ── Input Area ── */}
+      <div className="shrink-0 border-t border-[var(--brand-primary)]/10 bg-white p-4 z-10 relative">
+        <form
           onSubmit={handleSend}
           className="mx-auto flex max-w-4xl items-end gap-3"
         >
@@ -262,15 +264,16 @@ export function ChatWindow({
             type="submit"
             disabled={!inputText.trim() || isPending}
             size="icon"
-            className="h-12 w-12 shrink-0 rounded-full bg-[var(--brand-primary)] text-white shadow-md hover:bg-[#035170]"
+            className="h-12 w-12 shrink-0 rounded-full bg-[var(--brand-primary)] text-white shadow-md hover:opacity-90"
           >
             <Send className="h-4 w-4 ml-0.5" />
           </Button>
         </form>
-        <p className="mx-auto mt-2 max-w-4xl px-2 text-[11px] text-gray-400">
-          Press Enter to send. Press Shift+Enter for a new line.
+        <p className="mx-auto mt-2 max-w-4xl px-2 text-xs text-gray-400">
+          Press Enter to send · Shift+Enter for new line
         </p>
       </div>
     </div>
   );
 }
+

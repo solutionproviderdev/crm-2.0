@@ -10,6 +10,7 @@ import type {
   LeadComment,
   LeadPayment,
   LeadCallLog,
+  LeadFollowUp,
   CreateLeadInput,
   UpdateLeadInput,
 } from "@/lib/types";
@@ -312,7 +313,7 @@ export async function createLeadsBulk(
   const { data, error } = await supabase
     .from("leads")
     .insert(leads)
-    .select();
+    .select("id");
 
   if (error) return { success: false, error: error.message };
 
@@ -327,4 +328,55 @@ export async function createLeadsBulk(
       failed: leads.length - (data?.length || 0) 
     } 
   };
+}
+
+/**
+ * Updates the status of a follow-up task.
+ *
+ * @param id - Follow-up UUID
+ * @param status - New status (e.g., 'Complete', 'Pending')
+ * @param leadId - Lead UUID for cache revalidation
+ */
+export async function updateFollowUpStatus(
+  id: string,
+  status: string,
+  leadId: string
+): Promise<ActionResult<boolean>> {
+  const supabase = await getUserClient();
+
+  const { error } = await supabase
+    .from("lead_follow_ups")
+    .update({ status })
+    .eq("id", id);
+
+  if (error) return { success: false, error: error.message };
+
+  updateTag(CACHE_TAGS.LEAD_DETAILS(leadId));
+  revalidatePath(`/leads/${leadId}`);
+
+  return { success: true, data: true };
+}
+
+/**
+ * Creates a new follow-up task for a lead.
+ *
+ * @param input - Follow-up data
+ */
+export async function createFollowUp(
+  input: Partial<LeadFollowUp>
+): Promise<ActionResult<LeadFollowUp>> {
+  const supabase = await getUserClient();
+
+  const { data, error } = await supabase
+    .from("lead_follow_ups")
+    .insert([input])
+    .select()
+    .single();
+
+  if (error) return { success: false, error: error.message };
+
+  updateTag(CACHE_TAGS.LEAD_DETAILS(input.lead_id || ""));
+  revalidatePath(`/leads/${input.lead_id}`);
+
+  return { success: true, data: data as LeadFollowUp };
 }

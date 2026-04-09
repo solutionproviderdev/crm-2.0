@@ -21,6 +21,7 @@ import { useQueryState, parseAsInteger, parseAsString } from "nuqs";
 import { CreateLeadDialog } from "./CreateLeadDialog";
 import { BatchLeadImportDialog } from "./BatchLeadImportDialog";
 import { LeadPagination } from "./LeadPagination";
+import { LeadSidebar } from "./LeadSidebar";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -51,6 +52,7 @@ export function LeadsPageContent({ initialData, users }: LeadsPageContentProps) 
   const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(1).withOptions({ shallow: false }));
   const [sortBy, setSortBy] = useQueryState("sortBy", parseAsString.withDefault("created_at").withOptions({ shallow: false }));
   const [order, setOrder] = useQueryState("order", parseAsString.withDefault("desc").withOptions({ shallow: false }));
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   // Use globally-accurate status counts (not page-scoped counts)
   const chartData = initialData.statusCounts;
@@ -168,7 +170,11 @@ export function LeadsPageContent({ initialData, users }: LeadsPageContentProps) 
       {view === "grid" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {initialData.leads.map((lead) => (
-            <LeadCard key={lead.id} lead={lead} />
+            <LeadCard 
+              key={lead.id} 
+              lead={lead} 
+              onOpenSidebar={() => setSelectedLead(lead)}
+            />
           ))}
           {initialData.leads.length === 0 && (
             <div className="col-span-full h-64 flex flex-col items-center justify-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
@@ -183,6 +189,7 @@ export function LeadsPageContent({ initialData, users }: LeadsPageContentProps) 
           sortOrder={order as "asc" | "desc"}
           onSort={handleSort}
           users={users}
+          onOpenSidebar={(lead) => setSelectedLead(lead)}
         />
       )}
 
@@ -191,6 +198,13 @@ export function LeadsPageContent({ initialData, users }: LeadsPageContentProps) 
         totalPages={initialData.totalPages} 
         onPageChange={setPage} 
         className="pt-6 border-t border-gray-100"
+      />
+
+      <LeadSidebar 
+        lead={selectedLead}
+        isOpen={!!selectedLead}
+        onClose={() => setSelectedLead(null)}
+        allUsers={users}
       />
     </div>
   );

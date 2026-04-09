@@ -19,7 +19,9 @@ export {
   addPayment,
   bulkAssignLeads,
   addCallLog,
-  updateLeadProjectStatus
+  updateLeadProjectStatus,
+  updateFollowUpStatus,
+  createFollowUp
 } from "./mutations";
 
 export {

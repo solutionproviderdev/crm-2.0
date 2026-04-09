@@ -28,7 +28,8 @@ import {
   X,
   CheckCircle2,
   Loader2,
-  SearchX
+  SearchX,
+  Info
 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -52,6 +53,7 @@ interface LeadTableProps {
   sortOrder?: "asc" | "desc";
   onSort?: (field: string) => void;
   users: User[];
+  onOpenSidebar?: (lead: Lead) => void;
 }
 
 const ALL_COLUMNS = [
@@ -64,7 +66,7 @@ const ALL_COLUMNS = [
   { id: "address", label: "Address", sortable: false },
 ];
 
-export function LeadTable({ leads, sortBy, sortOrder, onSort, users }: LeadTableProps) {
+export function LeadTable({ leads, sortBy, sortOrder, onSort, users, onOpenSidebar }: LeadTableProps) {
   const [visibleColumns, setVisibleColumns] = useState<string[]>(["lead", "status", "team", "source", "joined", "contact"]);
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
@@ -321,6 +323,15 @@ export function LeadTable({ leads, sortBy, sortOrder, onSort, users }: LeadTable
                         <a href={`tel:${lead.phones[0]}`}>
                           <Phone className="h-4 w-4" />
                         </a>
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-9 w-9 rounded-xl text-gray-400 hover:text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 transition-all" 
+                        onClick={() => onOpenSidebar?.(lead)}
+                        title="Quick View"
+                      >
+                        <Info className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-gray-400 hover:text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/5 transition-all" asChild title="Lead Details">
                         <Link href={`/leads/${lead.id}`}>

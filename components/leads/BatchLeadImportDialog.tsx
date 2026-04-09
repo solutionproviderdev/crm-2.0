@@ -48,13 +48,25 @@ export function BatchLeadImportDialog({ users }: BatchLeadImportDialogProps) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"upload" | "preview" | "importing" | "result">("upload");
   const [parsedRows, setParsedRows] = useState<ParsedLeadRow[]>([]);
+  
+  // Progress/Batch States
   const [importResult, setImportResult] = useState<{ inserted: number; failed: number } | null>(null);
+  const [importProgress, setImportProgress] = useState({
+    total: 0,
+    processed: 0,
+    success: 0,
+    failed: 0,
+    currentBatchIndex: 0
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const BATCH_SIZE = 50;
 
   const reset = () => {
     setStep("upload");
     setParsedRows([]);
     setImportResult(null);
+    setImportProgress({ total: 0, processed: 0, success: 0, failed: 0, currentBatchIndex: 0 });
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,7 +103,7 @@ export function BatchLeadImportDialog({ users }: BatchLeadImportDialogProps) {
     }
   };
 
-  const handleImport = async () => {
+  const handleImport = async (resumeFromIndex = 0) => {
     const validLeads = parsedRows
       .filter((r) => r.isValid && r.mappedData)
       .map((r) => r.mappedData!);
@@ -103,28 +115,88 @@ export function BatchLeadImportDialog({ users }: BatchLeadImportDialogProps) {
 
     setStep("importing");
     
-    try {
-      const result = await createLeadsBulk(validLeads);
-      if (result.success) {
-        setImportResult(result.data);
-        setStep("result");
-        toast.success(`Successfully imported ${result.data.inserted} leads`);
-      } else {
-        toast.error(result.error || "Import failed");
-        setStep("preview");
-      }
-    } catch (error) {
-      console.error("Import error:", error);
-      toast.error("A network error occurred during import");
-      setStep("preview");
+    // Initialize or resume state
+    let currentSuccess = resumeFromIndex > 0 ? importProgress.success : 0;
+    let currentFailed = resumeFromIndex > 0 ? importProgress.failed : 0;
+    let currentProcessed = resumeFromIndex > 0 ? importProgress.processed : 0;
+
+    if (resumeFromIndex === 0) {
+      setImportProgress({
+        total: validLeads.length,
+        processed: 0,
+        success: 0,
+        failed: 0,
+        currentBatchIndex: 0
+      });
     }
+
+    // Process in chunks
+    for (let i = resumeFromIndex; i < validLeads.length; i += BATCH_SIZE) {
+      const chunk = validLeads.slice(i, i + BATCH_SIZE);
+      
+      setImportProgress(prev => ({ ...prev, currentBatchIndex: i }));
+
+      try {
+        const result = await createLeadsBulk(chunk);
+        
+        if (result.success) {
+          currentSuccess += result.data!.inserted;
+          currentFailed += result.data!.failed;
+        } else {
+          // If the entire chunk fails spectacularly
+          currentFailed += chunk.length;
+          toast.error(`Batch ${Math.floor(i/BATCH_SIZE) + 1} failed: ${result.error}`);
+          
+          // Pause process so user can see it failed and maybe retry
+          setImportProgress({
+            total: validLeads.length,
+            processed: currentProcessed,
+            success: currentSuccess,
+            failed: currentFailed,
+            currentBatchIndex: i
+          });
+          return; // Exit loop, leaving step as "importing" with failure state visible
+        }
+      } catch (error) {
+        console.error("Import error on chunk:", error);
+        currentFailed += chunk.length;
+        toast.error(`Network error on batch ${Math.floor(i/BATCH_SIZE) + 1}`);
+        
+        setImportProgress({
+          total: validLeads.length,
+          processed: currentProcessed,
+          success: currentSuccess,
+          failed: currentFailed,
+          currentBatchIndex: i
+        });
+        return; // Exit loop
+      }
+
+      currentProcessed += chunk.length;
+      setImportProgress({
+        total: validLeads.length,
+        processed: currentProcessed,
+        success: currentSuccess,
+        failed: currentFailed,
+        currentBatchIndex: i + chunk.length
+      });
+    }
+
+    // Finished all chunks
+    setImportResult({ inserted: currentSuccess, failed: currentFailed });
+    setStep("result");
+    toast.success(`Successfully finished import processing`);
   };
 
   const validCount = parsedRows.filter(r => r.isValid).length;
   const invalidCount = parsedRows.length - validCount;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+    <Dialog open={open} onOpenChange={(v) => { 
+      if (step === "importing") return; // Prevent closing while processing
+      setOpen(v); 
+      if (!v) reset(); 
+    }}>
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2 border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold shadow-sm">
           <Upload className="h-4 w-4" />
@@ -299,7 +371,7 @@ export function BatchLeadImportDialog({ users }: BatchLeadImportDialogProps) {
                 Cancel
               </Button>
               <Button 
-                onClick={handleImport}
+                onClick={() => handleImport(0)}
                 disabled={validCount === 0}
                 className="bg-(--brand-primary) text-white hover:opacity-90 rounded-xl font-bold gap-2 px-8"
               >
@@ -310,17 +382,76 @@ export function BatchLeadImportDialog({ users }: BatchLeadImportDialogProps) {
           </div>
         )}
 
-        {/* Step 3: Importing */}
+        {/* Step 3: Importing / Progress */}
         {step === "importing" && (
-          <div className="py-20 flex flex-col items-center justify-center gap-6">
-            <div className="relative">
-              <div className="h-16 w-16 rounded-full border-4 border-gray-100 border-t-(--brand-primary) animate-spin" />
-              <Loader2 className="h-6 w-6 text-(--brand-primary) absolute inset-0 m-auto animate-pulse" />
-            </div>
-            <div className="text-center">
-              <p className="text-lg font-bold text-gray-900 tracking-tight">Importing Leads...</p>
-              <p className="text-gray-500 text-sm mt-1 font-medium">Please do not close this window</p>
-            </div>
+          <div className="py-12 flex flex-col items-center justify-center gap-6">
+            
+            {importProgress.processed < importProgress.total ? (
+              // Active Importing State
+              <>
+                <div className="relative">
+                  <div className="h-16 w-16 rounded-full border-4 border-gray-100 border-t-(--brand-primary) animate-spin" />
+                  <Loader2 className="h-6 w-6 text-(--brand-primary) absolute inset-0 m-auto animate-pulse" />
+                </div>
+                
+                <div className="text-center w-full max-w-sm">
+                  <h3 className="text-xl font-bold text-gray-900 tracking-tight">Processing Leads...</h3>
+                  <p className="text-gray-500 text-sm mt-1 font-medium mb-6">
+                    Please do not close this window
+                  </p>
+                  
+                  {/* Progress Bar Container */}
+                  <div className="w-full bg-gray-100 rounded-full h-3 mb-2 overflow-hidden">
+                    <div 
+                      className="bg-(--brand-primary) h-3 rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${Math.max(5, (importProgress.processed / importProgress.total) * 100)}%` }}
+                    />
+                  </div>
+                  
+                  <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    <span>{importProgress.processed} / {importProgress.total} Leads</span>
+                    <span>{Math.round((importProgress.processed / importProgress.total) * 100) || 0}%</span>
+                  </div>
+                  
+                  <div className="flex gap-4 justify-center mt-6 text-sm">
+                    <span className="text-green-600 font-bold">{importProgress.success} Success</span>
+                    <span className="text-gray-300">|</span>
+                    <span className="text-red-500 font-bold">{importProgress.failed} Failed</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              // Paused / Error State
+              <div className="text-center space-y-6 w-full max-w-sm">
+                <div className="mx-auto h-16 w-16 rounded-full bg-red-50 flex items-center justify-center">
+                  <AlertCircle className="h-8 w-8 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Import Paused</h3>
+                  <p className="text-sm text-gray-500 mt-2">
+                    A batch failed to process. You can resume from where it left off.
+                  </p>
+                </div>
+                
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 text-sm font-medium flex justify-between">
+                  <div><span className="text-gray-400">Processed:</span> {importProgress.processed} / {importProgress.total}</div>
+                  <div><span className="text-green-600 font-bold">{importProgress.success}</span> / <span className="text-red-500 font-bold">{importProgress.failed}</span></div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setStep("result")}>
+                    Cancel & View Results
+                  </Button>
+                  <Button 
+                    className="flex-1 bg-(--brand-primary) hover:bg-(--brand-primary)/90 text-white" 
+                    onClick={() => handleImport(importProgress.currentBatchIndex)}
+                  >
+                    Resume Import
+                  </Button>
+                </div>
+              </div>
+            )}
+            
           </div>
         )}
 

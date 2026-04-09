@@ -10,7 +10,8 @@ import {
   MessageSquare, 
   MapPin, 
   Clock, 
-  ArrowRight
+  ArrowRight,
+  Info
 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -18,9 +19,10 @@ import { cn } from "@/utils/cn";
 
 interface LeadCardProps {
   lead: Lead;
+  onOpenSidebar?: () => void;
 }
 
-export function LeadCard({ lead }: LeadCardProps) {
+export function LeadCard({ lead, onOpenSidebar }: LeadCardProps) {
   // Get latest comment
   const latestComment = lead.comments && lead.comments.length > 0 ? lead.comments[0] : null;
   // Get next/latest meeting
@@ -37,6 +39,7 @@ export function LeadCard({ lead }: LeadCardProps) {
         "bg-gray-200"
       )} />
 
+
       <CardContent className="p-6">
         <div className="flex justify-between items-start mb-5">
           <Badge 
@@ -52,33 +55,48 @@ export function LeadCard({ lead }: LeadCardProps) {
             {lead.status}
           </Badge>
 
-          <div className="flex -space-x-2.5">
-            {lead.cre && (
-              <div className="relative group/avatar">
-                <Avatar className="h-8 w-8 border-2 border-white ring-1 ring-gray-100 shadow-sm transition-transform duration-300 hover:scale-110 hover:z-20">
-                  <AvatarImage src={lead.cre.profile_picture || ""} />
-                  <AvatarFallback className="text-[10px] bg-[var(--brand-primary)] text-white font-bold">
-                    {lead.cre.name[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="absolute hidden group-hover/avatar:block bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-[9px] font-bold rounded-lg whitespace-nowrap z-50 shadow-xl animate-in fade-in zoom-in duration-200">
-                  CRE: {lead.cre.name}
+          <div className="flex items-center gap-2">
+            <div className="flex -space-x-2.5">
+              {lead.cre && (
+                <div className="relative group/avatar">
+                  <Avatar className="h-8 w-8 border-2 border-white ring-1 ring-gray-100 shadow-sm transition-transform duration-300 hover:scale-110 hover:z-20">
+                    <AvatarImage src={lead.cre.profile_picture || ""} />
+                    <AvatarFallback className="text-[10px] bg-[var(--brand-primary)] text-white font-bold">
+                      {lead.cre.name[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute hidden group-hover/avatar:block bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-[9px] font-bold rounded-lg whitespace-nowrap z-50 shadow-xl animate-in fade-in zoom-in duration-200">
+                    CRE: {lead.cre.name}
+                  </div>
                 </div>
-              </div>
-            )}
-            {lead.sales_executive && (
-              <div className="relative group/avatar">
-                <Avatar className="h-8 w-8 border-2 border-white ring-1 ring-gray-100 shadow-sm transition-transform duration-300 hover:scale-110 hover:z-20">
-                  <AvatarImage src={lead.sales_executive.profile_picture || ""} />
-                  <AvatarFallback className="text-[10px] bg-emerald-600 text-white font-bold">
-                    {lead.sales_executive.name[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="absolute hidden group-hover/avatar:block bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-[9px] font-bold rounded-lg whitespace-nowrap z-50 shadow-xl animate-in fade-in zoom-in duration-200">
-                  Sales: {lead.sales_executive.name}
+              )}
+              {lead.sales_executive && (
+                <div className="relative group/avatar">
+                  <Avatar className="h-8 w-8 border-2 border-white ring-1 ring-gray-100 shadow-sm transition-transform duration-300 hover:scale-110 hover:z-20">
+                    <AvatarImage src={lead.sales_executive.profile_picture || ""} />
+                    <AvatarFallback className="text-[10px] bg-emerald-600 text-white font-bold">
+                      {lead.sales_executive.name[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute hidden group-hover/avatar:block bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-[9px] font-bold rounded-lg whitespace-nowrap z-50 shadow-xl animate-in fade-in zoom-in duration-200">
+                    Sales: {lead.sales_executive.name}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+
+            {/* Info Icon Trigger */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.preventDefault();
+                onOpenSidebar?.();
+              }}
+              className="h-8 w-8 rounded-full border border-gray-100 shadow-sm text-gray-400 hover:text-[var(--brand-primary)] hover:bg-gray-50 transition-all active:scale-95 translate-y-0.5"
+            >
+              <Info className="h-4.5 w-4.5" />
+            </Button>
           </div>
         </div>
 

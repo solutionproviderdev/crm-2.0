@@ -4,7 +4,8 @@ import type { PermissionMap } from "./permissions";
 
 export type UserType = "Admin" | "Operator";
 export type UserGender = "Male" | "Female" | "Other";
-export type UserStatus = "Active" | "Inactive";
+import type { EmploymentStatusValue, AccountStatusValue } from "@/constants/employeeStatus";
+
 export type DocumentType =
   | "resume"
   | "nid_copy"
@@ -36,7 +37,8 @@ export interface Role {
 export interface User {
   id: string;
   type: UserType;
-  status: UserStatus;
+  account_status: AccountStatusValue;
+  employment_status: EmploymentStatusValue;
   name: string;
   nickname: string | null;
   email: string;
@@ -97,7 +99,8 @@ export interface CreateUserInput {
   email: string;
   password: string;
   type: UserType;
-  status?: UserStatus;
+  account_status?: AccountStatusValue;
+  employment_status?: EmploymentStatusValue;
   personal_phone?: string;
   office_phone?: string;
   gender?: UserGender;

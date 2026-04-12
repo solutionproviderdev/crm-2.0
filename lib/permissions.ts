@@ -32,31 +32,53 @@ export const ALL_PERMISSIONS = [
     resource: "Utility",
     actions: ["Map Data"],
   },
+  {
+    resource: "Pipelines",
+    actions: ["Client Pipeline", "Project Pipeline"],
+  },
 ] as const;
 
 export type PermissionResource = (typeof ALL_PERMISSIONS)[number]["resource"];
 export type PermissionMap = Record<string, Record<string, boolean>>;
 
 /** Routes that ALL authenticated users can access regardless of permissions */
-export const PUBLIC_DASHBOARD_ROUTES = ["/dashboard", "/dashboard/profile"];
+export const PUBLIC_DASHBOARD_ROUTES = [
+  "/dashboard",
+  "/dashboard/profile",
+  "/reminders",
+  "/chat",
+  "/settings",
+];
 
-/** Map from permission resource+action → Next.js route prefix */
+/**
+ * Routes that are permission-GATED (access requires the mapped permission).
+ * Values must exactly match the Next.js app/(protected) route prefixes.
+ */
 export const PERMISSION_ROUTE_MAP: Record<string, string> = {
-  "User:All Users":         "/dashboard/users",
-  "User:User Profile":      "/dashboard/users/",
-  "User:Departments":       "/dashboard/users/departments",
-  "User:Roles":             "/dashboard/users/roles",
-  "CRE - Lead:Lead Center": "/dashboard/cre/lead-center",
-  "CRE - Lead:Lead Management": "/dashboard/cre/leads",
-  "CRE - Lead:Follow Up":   "/dashboard/cre/follow-up",
-  "Sales:Lead Center":      "/dashboard/sales/leads",
+  // User management
+  "User:All Users":         "/users",
+  "User:User Profile":      "/users/",
+  "User:Departments":       "/users/departments",
+  "User:Roles":             "/users/roles",
+  // CRE Lead access
+  "CRE - Lead:Lead Center": "/leads",
+  "CRE - Lead:Lead Management": "/leads",
+  "CRE - Lead:Follow Up":   "/reminders",
+  // Sales
+  "Sales:Lead Center":      "/leads",
   "Sales:Meeting Schedule": "/meetings/slots",
+  // Meetings
   "Meetings:Daily Meetings":"/meetings/slots",
-  "Meetings:Meeting History":"/dashboard/meetings/history",
-  "Reports:Sales Report":   "/dashboard/reports/sales",
-  "Reports:Lead Report":    "/dashboard/reports/leads",
-  "Reports:Finance Report": "/dashboard/reports/finance",
+  "Meetings:Meeting History":"/meetings",
+  // Reports
+  "Reports:Sales Report":   "/reports/sales",
+  "Reports:Lead Report":    "/reports/leads",
+  "Reports:Finance Report": "/reports/finance",
+  // Utility
   "Utility:Map Data":       "/utility/map",
+  // Pipelines
+  "Pipelines:Client Pipeline": "/clients",
+  "Pipelines:Project Pipeline": "/projects",
 };
 
 /** Build a flat set of allowed route prefixes from a permissions map */

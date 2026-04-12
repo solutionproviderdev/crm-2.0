@@ -37,6 +37,8 @@ export async function getFilteredLeads(params: {
   search?: string;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+  userId?: string;
+  isAdmin?: boolean;
 }): Promise<
   ActionResult<{
     leads: Lead[];
@@ -60,6 +62,8 @@ export async function getFilteredLeads(params: {
     search,
     sortBy = "created_at",
     sortOrder = "desc",
+    userId,
+    isAdmin = true, // Default to true to not break existing calls if any
   } = params;
 
   const supabase = createAdminClient();
@@ -88,6 +92,11 @@ export async function getFilteredLeads(params: {
     `,
       { count: "exact" }
     );
+
+  // ── Non-admin data scoping ────────────────────────────────────────────────
+  if (!isAdmin && userId) {
+    query = query.or(`cre_id.eq.${userId},sales_executive_id.eq.${userId}`);
+  }
 
   if (search) {
     query = query.or(
@@ -163,18 +172,28 @@ export async function getLeadFilterOptions(): Promise<
  *
  * @returns Array of { status, count } objects
  */
-export async function getLeadStatusCounts(): Promise<
+export async function getLeadStatusCounts(params?: {
+  userId?: string;
+  isAdmin?: boolean;
+}): Promise<
   ActionResult<{ status: string; count: number }[]>
 > {
   "use cache";
   cacheLife("minutes");
   cacheTag(CACHE_TAGS.LEAD_STATUS_COUNTS);
 
+  const isAdmin = params?.isAdmin ?? true;
+  const userId = params?.userId;
+
   const supabase = createAdminClient();
 
-  const { data, error } = await supabase
-    .from("leads")
-    .select("status");
+  let query = supabase.from("leads").select("status");
+
+  if (!isAdmin && userId) {
+    query = query.or(`cre_id.eq.${userId},sales_executive_id.eq.${userId}`);
+  }
+
+  const { data, error } = await query;
 
   if (error) return { success: false, error: error.message };
 
@@ -200,14 +219,17 @@ export async function getLeadStatusCounts(): Promise<
  *
  * @param id - The lead UUID
  */
-export async function getLeadDetails(id: string): Promise<ActionResult<Lead>> {
+export async function getLeadDetails(
+  id: string,
+  params?: { userId?: string; isAdmin?: boolean }
+): Promise<ActionResult<Lead>> {
   "use cache";
   cacheLife("minutes");
   cacheTag(CACHE_TAGS.LEAD_DETAILS(id));
 
   const supabase = createAdminClient();
 
-  const { data: lead, error: leadErr } = await supabase
+  let query = supabase
     .from("leads")
     .select(
       `
@@ -216,8 +238,14 @@ export async function getLeadDetails(id: string): Promise<ActionResult<Lead>> {
       cre:users!leads_cre_id_fkey(id, name, profile_picture)
     `
     )
-    .eq("id", id)
-    .single();
+    .eq("id", id);
+
+  // ── Non-admin data scoping ────────────────────────────────────────────────
+  if (params?.isAdmin === false && params?.userId) {
+    query = query.or(`cre_id.eq.${params.userId},sales_executive_id.eq.${params.userId}`);
+  }
+
+  const { data: lead, error: leadErr } = await query.single();
 
   if (leadErr) return { success: false, error: leadErr.message };
 
@@ -318,7 +346,8 @@ export async function getAllActiveUsers(): Promise<ActionResult<User[]>> {
   const { data, error } = await supabase
     .from("users")
     .select("*, department:departments(*), role:roles(*)")
-    .eq("status", "Active")
+    .eq("account_status", "active")
+    .neq("id", process.env.NEXT_PUBLIC_SENTINEL_USER_ID ?? "00000000-0000-0000-0000-000000000000")
     .order("name", { ascending: true });
 
   if (error) return { success: false, error: error.message };

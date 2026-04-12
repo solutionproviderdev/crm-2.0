@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import type { ChatMessage, ChatUser } from "@/lib/types";
+import { SENTINEL_USER_ID } from "@/constants/system";
 
 export function ChatWindow({
   chatId,
@@ -176,6 +177,7 @@ export function ChatWindow({
         )}
 
         {messages.map((msg, index) => {
+          const isSentinel = msg.sender.id === SENTINEL_USER_ID;
           const isMe = msg.sender.id === currentUserId;
           const prevMsg = index > 0 ? messages[index - 1] : null;
           const isThread = prevMsg?.sender.id === msg.sender.id && isSameDay(new Date(prevMsg.created_at), new Date(msg.created_at));
@@ -201,10 +203,10 @@ export function ChatWindow({
                 )}
               >
                 {!isMe && !isThread && (
-                  <Avatar className="h-7 w-7 self-end ring-1 ring-[var(--brand-primary)]/10">
+                  <Avatar className={cn("h-7 w-7 self-end ring-1", isSentinel ? "ring-gray-200 opacity-50 grayscale" : "ring-[var(--brand-primary)]/10")}>
                     <AvatarImage src={msg.sender.profile_picture || undefined} alt={msg.sender.name} />
-                    <AvatarFallback className="bg-gradient-to-br from-[var(--brand-primary)] to-[#0a8cb3] text-[10px] font-bold text-white">
-                      {msg.sender.name.charAt(0)}
+                    <AvatarFallback className={cn("text-[10px] font-bold text-white", isSentinel ? "bg-gray-400" : "bg-gradient-to-br from-[var(--brand-primary)] to-[#0a8cb3]")}>
+                      {isSentinel ? "👻" : msg.sender.name.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
                 )}
@@ -217,8 +219,8 @@ export function ChatWindow({
                   )}
                 >
                   {!isMe && !isThread && (
-                    <span className="mb-1 px-1 text-[11px] font-semibold text-gray-500">
-                      {msg.sender.name}
+                    <span className={cn("mb-1 px-1 text-[11px] font-semibold", isSentinel ? "text-gray-400 italic" : "text-gray-500")}>
+                      {isSentinel ? "[Deleted User]" : msg.sender.name}
                     </span>
                   )}
 

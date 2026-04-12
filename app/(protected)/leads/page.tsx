@@ -8,6 +8,7 @@ import {
   getLeadStatusCounts,
   getAllActiveUsers,
 } from '@/app/actions/leads';
+import { getCurrentUser } from '@/app/actions/auth';
 
 interface LeadsPageProps {
   searchParams: Promise<{
@@ -44,6 +45,10 @@ async function LeadsContent({
 }) {
   // Await the dynamic data INSIDE the Suspense-able async component
   const params = await searchParams;
+  const user = await getCurrentUser();
+
+  const isAdmin = user?.type === 'Admin';
+  const userId = user?.id;
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const filterParams = {
@@ -58,13 +63,15 @@ async function LeadsContent({
     endDate: params.search ? params.endDate : (params.endDate || today),
     sortBy: params.sortBy || 'created_at',
     sortOrder: (params.order as 'asc' | 'desc') || 'desc',
+    userId,
+    isAdmin,
   };
 
   const [leadsResult, filterOptionsResult, statusCountsResult, usersResult] =
     await Promise.all([
       getFilteredLeads(filterParams),
       getLeadFilterOptions(),
-      getLeadStatusCounts(),
+      getLeadStatusCounts({ userId, isAdmin }),
       getAllActiveUsers(),
     ]);
 

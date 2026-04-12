@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { SENTINEL_USER_ID } from "@/constants/system";
 import type { ChatSidebarItem, ChatUser, ContactableUser } from "@/lib/types";
 
 interface ChatParticipantRow {
@@ -51,6 +52,7 @@ export async function getContactableUsers() {
     .from("users")
     .select("id, name, department:departments(name), profile_picture")
     .neq("id", user.id)
+    .neq("id", SENTINEL_USER_ID)
     .order("name");
 
   if (error) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Lead, LeadComment } from "@/lib/types";
+import { Lead } from "@/lib/types";
 import { useState, useTransition, useRef, useEffect } from "react";
 import { addLeadComment } from "@/app/actions/leads";
 import { toast } from "sonner";

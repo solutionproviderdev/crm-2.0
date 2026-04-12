@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { createClient as createStandardClient } from "@/utils/supabase/server";
 import { createAdminClient as createServiceRoleClient } from "@/utils/supabase/admin";
 import type {
@@ -8,8 +9,9 @@ import type {
   User,
   CreateUserInput,
   UpdateUserInput,
-  UserStatus,
 } from "@/lib/types";
+import type { AccountStatusValue, EmploymentStatusValue } from "@/constants/employeeStatus";
+import type { ValidatedUserRow } from "@/lib/user-import-utils";
 
 async function getStandardClient() {
   const cookieStore = await cookies();
@@ -97,6 +99,8 @@ export async function createUser(
     .update({
       nickname:          input.nickname || null,
       type:              input.type,
+      account_status:    input.account_status || 'active',
+      employment_status: input.employment_status || 'trainee',
       personal_phone:    input.personal_phone || null,
       office_phone:      input.office_phone || null,
       gender:            input.gender || null,
@@ -135,14 +139,19 @@ export async function updateUser(
   return { success: true, data: data as User };
 }
 
-export async function updateUserStatus(
+export async function updateUserStatuses(
   id: string,
-  status: UserStatus
+  account_status?: AccountStatusValue,
+  employment_status?: EmploymentStatusValue
 ): Promise<ActionResult<null>> {
   const supabase = await getStandardClient();
+  const updateData: any = {};
+  if (account_status) updateData.account_status = account_status;
+  if (employment_status) updateData.employment_status = employment_status;
+
   const { error } = await supabase
     .from("users")
-    .update({ status })
+    .update(updateData)
     .eq("id", id);
 
   if (error) return { success: false, error: error.message };
@@ -222,9 +231,100 @@ export async function getUserDropdownOptions(): Promise<
   const { data, error } = await supabase
     .from("users")
     .select("id, name, type")
-    .eq("status", "Active")
+    .eq("account_status", "active")
     .order("name");
 
   if (error) return { success: false, error: error.message };
   return { success: true, data: data || [] };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bulk User Import
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface BulkImportResult {
+  succeeded: number;
+  failed: Array<{ email: string; error: string }>;
+}
+
+/**
+ * Creates multiple users in both Supabase Auth and public.users.
+ * Auth + profile are treated as one atomic unit — if the DB insert fails,
+ * the auth user is deleted (rollback) to avoid ghost accounts.
+ * Passwords are passed directly to auth.admin.createUser and never stored.
+ */
+export async function bulkCreateUsers(
+  rows: ValidatedUserRow[]
+): Promise<BulkImportResult> {
+  const supabase = await getServiceRoleClient();
+  const today    = new Date().toISOString().split("T")[0];
+  const result:  BulkImportResult = { succeeded: 0, failed: [] };
+
+  for (const row of rows) {
+    // Only process valid rows — safety net (dialog already filters)
+    if (!row.valid) continue;
+
+    // ── Step 1: Create auth user ──────────────────────────────────────────
+    const { data: authData, error: authError } =
+      await supabase.auth.admin.createUser({
+        email:           row.email,
+        password:        row.password,
+        email_confirm:   true,
+        user_metadata:   { name: row.name },
+      });
+
+    if (authError || !authData.user) {
+      result.failed.push({
+        email: row.email,
+        error: authError?.message ?? "Failed to create auth account",
+      });
+      continue;
+    }
+
+    const authUserId = authData.user.id;
+
+    // ── Step 2: Insert public.users profile ───────────────────────────────
+    // Supabase trigger already inserts a bare row on auth.users insert.
+    // We UPDATE (same as single createUser) instead of INSERT to avoid conflicts.
+    const { error: profileError } = await supabase
+      .from("users")
+      .update({
+        name:              row.name,
+        email:             row.email,
+        nickname:          row.nickname          ?? null,
+        personal_phone:    row.personal_phone    ?? null,
+        office_phone:      row.office_phone      ?? null,
+        gender:            row.gender            ?? null,
+        address:           row.address           ?? null,
+        date_of_birth:     row.date_of_birth     ?? null,
+        joining_date:      row.joining_date      ?? today,
+        current_salary:    row.current_salary    ?? null,
+        guardian_name:     row.guardian_name     ?? null,
+        guardian_phone:    row.guardian_phone    ?? null,
+        guardian_relation: row.guardian_relation ?? null,
+        department_id:     row.department_id     ?? null,
+        role_id:           row.role_id           ?? null,
+        type:              row.type              ?? "Operator",
+        employment_status: row.employment_status ?? "trainee",
+        account_status:    row.account_status    ?? "active",
+      })
+      .eq("id", authUserId);
+
+    if (profileError) {
+      // Rollback: delete auth user so no ghost account remains
+      await supabase.auth.admin.deleteUser(authUserId);
+      result.failed.push({
+        email: row.email,
+        error: `Profile insert failed: ${profileError.message}`,
+      });
+      continue;
+    }
+
+    result.succeeded++;
+  }
+
+  revalidatePath("/users");
+  revalidatePath("/dashboard");
+
+  return result;
 }

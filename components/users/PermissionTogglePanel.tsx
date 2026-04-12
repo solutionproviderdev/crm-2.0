@@ -1,6 +1,6 @@
 "use client";
 
-import { ALL_PERMISSIONS } from "@/lib/permissions";
+import { ALL_PERMISSIONS, PERMISSION_ROUTE_MAP } from "@/lib/permissions";
 import type { PermissionMap } from "@/lib/permissions";
 
 interface Props {
@@ -82,7 +82,17 @@ export function PermissionTogglePanel({ permissions, onChange, readOnly = false 
                 </button>
                 <div>
                   <p className="font-semibold text-sm text-gray-900">{resource}</p>
-                  <p className="text-xs text-gray-400">
+                  
+                  {/* Show allowed routes for this resource group */}
+                  <div className="mt-0.5 flex flex-wrap gap-1">
+                    {Array.from(new Set(actions.map(a => PERMISSION_ROUTE_MAP[`${resource}:${a}`]).filter(Boolean))).map((routeUrl) => (
+                      <span key={routeUrl} className="px-1.5 py-0.5 bg-gray-200/50 text-gray-400 text-[10px] rounded-md border border-gray-200/50">
+                        {routeUrl}
+                      </span>
+                    ))}
+                  </div>
+
+                  <p className="text-[11px] text-gray-400 mt-1">
                     {enabled}/{actions.length} actions enabled
                   </p>
                 </div>

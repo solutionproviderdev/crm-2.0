@@ -16,30 +16,53 @@ import {
   ArrowLeft,
   ShieldCheck,
   Pencil,
+  Trash2,
+  ChevronDown,
 } from "lucide-react";
-import type { User } from "@/lib/types";
-import { updateUserStatus } from "@/app/actions/users";
+import Link from "next/link";
+import { updateUserStatuses } from "@/app/actions/users";
 import { PermissionTogglePanel } from "@/components/users/PermissionTogglePanel";
+import { DeleteEmployeeModal } from "@/components/employees/DeleteEmployeeModal";
+import { getAccountStatusLabel, getEmploymentStatusLabel, ACCOUNT_STATUSES, EMPLOYMENT_STATUSES } from "@/constants/employeeStatus";
+import type { Employee, AccountStatusValue, EmploymentStatusValue } from "@/types/employee";
 import type { PermissionMap } from "@/lib/permissions";
 
 interface Props {
-  user: User;
+  user: Employee;
+  isAdmin?: boolean;
 }
+
+const ACCOUNT_STATUS_COLORS: Record<string, string> = {
+  active: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  inactive: "bg-gray-100 text-gray-700 border-gray-200",
+  pending: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  locked: "bg-red-100 text-red-700 border-red-200",
+  archived: "bg-slate-200 text-slate-800 border-slate-300",
+};
 
 const TABS = ["Contact", "Employment", "Access & Role", "Documents"] as const;
 type Tab = (typeof TABS)[number];
 
-export function UserProfileClient({ user: initialUser }: Props) {
+export function UserProfileClient({ user: initialUser, isAdmin = false }: Props) {
   const router = useRouter();
   const [user, setUser] = useState(initialUser);
   const [activeTab, setActiveTab] = useState<Tab>("Contact");
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
-  async function handleToggleStatus() {
+  async function handleAccountStatusChange(newStatus: AccountStatusValue) {
+    if (!isAdmin) return;
     setIsTogglingStatus(true);
-    const newStatus = user.status === "Active" ? "Inactive" : "Active";
-    const result = await updateUserStatus(user.id, newStatus);
-    if (result.success) setUser((u) => ({ ...u, status: newStatus }));
+    const result = await updateUserStatuses(user.id, newStatus, undefined);
+    if (result.success) setUser((u) => ({ ...u, account_status: newStatus }));
+    setIsTogglingStatus(false);
+  }
+
+  async function handleEmploymentStatusChange(newStatus: EmploymentStatusValue) {
+    if (!isAdmin) return;
+    setIsTogglingStatus(true);
+    const result = await updateUserStatuses(user.id, undefined, newStatus);
+    if (result.success) setUser((u) => ({ ...u, employment_status: newStatus }));
     setIsTogglingStatus(false);
   }
 
@@ -146,32 +169,63 @@ export function UserProfileClient({ user: initialUser }: Props) {
         {/* Status toggle + Edit */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400">
-              {user.status === "Active" ? "Active" : "Inactive"}
-            </span>
-            <button
-              onClick={handleToggleStatus}
-              disabled={isTogglingStatus}
-              className={`relative w-11 h-6 rounded-full transition-colors duration-200 flex items-center px-0.5 ${
-                user.status === "Active" ? "bg-emerald-400" : "bg-gray-200"
-              } disabled:opacity-50`}
-              aria-label="Toggle user status"
-            >
-              <span
-                className={`h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
-                  user.status === "Active" ? "translate-x-5" : "translate-x-0"
-                }`}
-              />
-            </button>
+            {/* Employment Status */}
+            {isAdmin ? (
+              <div className="relative border-r border-gray-200 pr-2">
+                <select
+                  value={user.employment_status}
+                  onChange={(e) => handleEmploymentStatusChange(e.target.value as EmploymentStatusValue)}
+                  disabled={isTogglingStatus}
+                  className={`appearance-none focus:ring-2 focus:ring-blue-500 focus:outline-none pl-2.5 pr-7 py-1 rounded-md text-xs font-semibold border transition bg-blue-50 text-blue-700 border-blue-200 ${
+                    isTogglingStatus ? 'opacity-50' : 'cursor-pointer'
+                  }`}
+                >
+                  {EMPLOYMENT_STATUSES.map(s => (
+                    <option key={s.value} value={s.value} className="bg-white text-gray-900">
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60 text-blue-700" />
+              </div>
+            ) : (
+              <span className="inline-flex px-2.5 py-1 rounded-md border text-xs font-medium capitalize bg-blue-50 text-blue-700 border-blue-200 mr-2">
+                {getEmploymentStatusLabel(user.employment_status)}
+              </span>
+            )}
+
+            {/* Account Status */}
+            {isAdmin ? (
+              <div className="relative">
+                <select
+                  value={user.account_status}
+                  onChange={(e) => handleAccountStatusChange(e.target.value as AccountStatusValue)}
+                  disabled={isTogglingStatus}
+                  className={`appearance-none focus:ring-2 focus:ring-emerald-500 focus:outline-none pl-2.5 pr-7 py-1 rounded-md text-xs font-semibold border transition ${
+                    isTogglingStatus ? 'opacity-50' : 'cursor-pointer'
+                  } ${ACCOUNT_STATUS_COLORS[user.account_status] || ACCOUNT_STATUS_COLORS.inactive}`}
+                >
+                  {ACCOUNT_STATUSES.map(s => (
+                    <option key={s.value} value={s.value} className="bg-white text-gray-900">
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none opacity-60" />
+              </div>
+            ) : (
+              <span className={`inline-flex px-2.5 py-1 rounded-md border text-xs font-medium capitalize ${ACCOUNT_STATUS_COLORS[user.account_status] || ACCOUNT_STATUS_COLORS.inactive}`}>
+                {getAccountStatusLabel(user.account_status)}
+              </span>
+            )}
           </div>
-          {/* Edit — marked as coming soon until edit page is built */}
-          <button
-            disabled
-            title="Edit profile — coming soon"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-400 cursor-not-allowed select-none"
+          
+          <Link
+            href={`/users/${user.id}/edit`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
             <Pencil className="h-3.5 w-3.5" /> Edit
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -208,12 +262,34 @@ export function UserProfileClient({ user: initialUser }: Props) {
         {activeTab === "Access & Role" && <AccessRoleTab user={user} />}
         {activeTab === "Documents" && <DocumentsTab user={user} />}
       </div>
+
+      {/* ── Danger Zone (Admin Only) ───────────────────────── */}
+      {isAdmin && (
+        <div className="mt-8 pt-6 border-t border-red-100 flex justify-end">
+          <button
+            onClick={() => setIsDeleteOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 text-red-700 hover:bg-red-600 hover:text-white border border-red-200 hover:border-red-600 transition duration-200 text-sm font-semibold shadow-sm"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete Employee
+          </button>
+        </div>
+      )}
+
+      {/* Delete Modal */}
+      {isAdmin && isDeleteOpen && (
+        <DeleteEmployeeModal 
+          user={user} 
+          isOpen={isDeleteOpen} 
+          onClose={() => setIsDeleteOpen(false)} 
+        />
+      )}
     </div>
   );
 }
 
 // ── Contact Tab ────────────────────────────────────────────────────────────
-function ContactTab({ user }: { user: User }) {
+function ContactTab({ user }: { user: Employee }) {
   const fields = [
     { icon: Mail,    label: "Email",          value: user.email },
     { icon: Phone,   label: "Personal Phone", value: user.personal_phone },
@@ -256,11 +332,16 @@ function ContactTab({ user }: { user: User }) {
 }
 
 // ── Employment Tab ─────────────────────────────────────────────────────────
-function EmploymentTab({ user }: { user: User }) {
+function EmploymentTab({ user }: { user: Employee }) {
   return (
     <div className="space-y-4">
       <SectionTitle>Employment Details</SectionTitle>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <InfoRow
+          label="Employment Status"
+          value={getEmploymentStatusLabel(user.employment_status)}
+          icon={Briefcase}
+        />
         <InfoRow
           label="Joining Date"
           value={
@@ -301,7 +382,7 @@ function EmploymentTab({ user }: { user: User }) {
 }
 
 // ── Access Role Tab ────────────────────────────────────────────────────────
-function AccessRoleTab({ user }: { user: User }) {
+function AccessRoleTab({ user }: { user: Employee }) {
   const permissions = (user.role?.permissions ?? {}) as PermissionMap;
 
   return (
@@ -327,7 +408,7 @@ function AccessRoleTab({ user }: { user: User }) {
 }
 
 // ── Documents Tab ──────────────────────────────────────────────────────────
-function DocumentsTab({ user }: { user: User }) {
+function DocumentsTab({ user }: { user: Employee }) {
   const docLabels: Record<string, string> = {
     resume:            "Resume / CV",
     nid_copy:          "NID Copy",

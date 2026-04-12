@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LayoutDashboard, Users, Bell, MessagesSquare, CalendarDays, Wrench } from 'lucide-react';
+import { LayoutDashboard, Users, Bell, MessagesSquare, CalendarDays, Wrench, Handshake, Construction } from 'lucide-react';
 import { logout } from '@/app/actions/auth';
 import type { User } from '@/lib/types';
 import type { PermissionMap } from '@/lib/permissions';
@@ -14,16 +14,18 @@ import type { SiteSettings } from '@/lib/types';
 interface NavItem {
 	name: string;
 	href: string;
+	alternateHrefs?: string[];
 	icon: React.ElementType;
 }
 
-// All possible nav items - Global level
 const ALL_NAV_ITEMS: NavItem[] = [
 	{ name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-	{ name: 'Leads', href: '/leads', icon: Users },
+	{ name: 'Leads', href: '/leads', alternateHrefs: [], icon: Users },
+	{ name: 'Clients', href: '/clients', icon: Handshake },
+	{ name: 'Projects', href: '/projects', icon: Construction },
 	{ name: 'Reminders', href: '/reminders', icon: Bell },
-	{ name: 'Meetings', href: '/meetings/slots', icon: CalendarDays },
-	{ name: 'Users', href: '/users', icon: Users },
+	{ name: 'Meetings', href: '/meetings/slots', alternateHrefs: ['/meetings'], icon: CalendarDays },
+	{ name: 'Users', href: '/users', alternateHrefs: ['/users/departments', '/users/roles'], icon: Users },
 	{ name: 'Chat', href: '/chat', icon: MessagesSquare },
 	{ name: 'Utility', href: '/utility/map', icon: Wrench },
 ];
@@ -59,11 +61,23 @@ export function DashboardShell({ user, settings, children }: Props) {
 		}
 	}, [searchParams, router]);
 
-	// Filter nav items based on role permissions
-	const visibleNavItems = ALL_NAV_ITEMS.filter(item => {
-		if (item.href === '/dashboard') return true;
-		return isRouteAllowed(item.href, permissions, isAdmin);
-	});
+	// Filter nav items based on role permissions.
+	// PUBLIC items (Dashboard, Chat, Reminders) always show.
+	// All other items require at least one matching permission.
+	const ALWAYS_VISIBLE = new Set(['Dashboard', 'Chat', 'Reminders']);
+
+	const visibleNavItems = ALL_NAV_ITEMS.map(item => {
+		// Always visible items — no permission required
+		if (ALWAYS_VISIBLE.has(item.name)) return item;
+		// Admins see everything
+		if (isAdmin) return item;
+
+		// Check if any of this item's routes is permitted
+		const hrefsToCheck = [item.href, ...(item.alternateHrefs || [])];
+		const firstAllowed = hrefsToCheck.find(h => isRouteAllowed(h, permissions, false));
+		if (firstAllowed) return { ...item, href: firstAllowed };
+		return null;
+	}).filter(Boolean) as NavItem[];
 
 	async function handleLogout() {
 		setIsLoggingOut(true);

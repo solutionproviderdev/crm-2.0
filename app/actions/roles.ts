@@ -89,6 +89,7 @@ export async function createRole(
   if (input.department_id)
     updateTag(CACHE_TAGS.ROLES_BY_DEPT(input.department_id));
   revalidatePath("/settings");
+  revalidatePath("/", "layout");
 
   return { success: true, data: data as Role };
 }
@@ -116,6 +117,7 @@ export async function updateRole(
 
   updateTag(CACHE_TAGS.ROLES);
   revalidatePath("/settings");
+  revalidatePath("/", "layout");
 
   return { success: true, data: data as Role };
 }
@@ -141,6 +143,7 @@ export async function updateRolePermissions(
 
   updateTag(CACHE_TAGS.ROLES);
   revalidatePath("/settings");
+  revalidatePath("/", "layout");
 
   return { success: true, data: null };
 }
@@ -159,6 +162,7 @@ export async function deleteRole(id: string): Promise<ActionResult<null>> {
 
   updateTag(CACHE_TAGS.ROLES);
   revalidatePath("/settings");
+  revalidatePath("/", "layout");
 
   return { success: true, data: null };
 }

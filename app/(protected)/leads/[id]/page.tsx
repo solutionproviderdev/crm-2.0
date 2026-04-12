@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { getLeadDetails, getAllActiveUsers } from "@/app/actions/leads";
+import { getCurrentUser } from "@/app/actions/auth";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -21,8 +22,9 @@ interface PageProps {
  * preventing a blocking route error in Next.js 16.
  */
 async function LeadDetailsContent({ id }: { id: string }) {
+  const user = await getCurrentUser();
   const [result, usersRes] = await Promise.all([
-    getLeadDetails(id),
+    getLeadDetails(id, { userId: user?.id, isAdmin: user?.type === "Admin" }),
     getAllActiveUsers(),
   ]);
 

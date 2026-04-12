@@ -49,7 +49,8 @@ export async function login(formData: FormData): Promise<ActionResult<User>> {
         email: authData.user.email!,
         name: authData.user.user_metadata?.name || authData.user.email!.split("@")[0],
         type: "Operator",
-        status: "Active",
+        account_status: "active",
+        employment_status: "trainee",
       })
       .select(`
         *,
@@ -66,11 +67,11 @@ export async function login(formData: FormData): Promise<ActionResult<User>> {
   }
 
   // 3. Check status
-  if (user.status === "Inactive") {
+  if (user.account_status !== "active") {
     await supabase.auth.signOut();
     return {
       success: false,
-      error: "Your account has been deactivated. Contact admin.",
+      error: "Your account is not active. Contact admin.",
     };
   }
 

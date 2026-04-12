@@ -221,7 +221,6 @@ CREATE TABLE public.user_social_links (
 CREATE TABLE public.users (
   id uuid NOT NULL,
   type USER-DEFINED NOT NULL DEFAULT 'Operator'::user_type,
-  status USER-DEFINED NOT NULL DEFAULT 'Active'::user_status,
   name text NOT NULL,
   nickname text,
   email text NOT NULL UNIQUE,
@@ -243,6 +242,8 @@ CREATE TABLE public.users (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   theme_preference text DEFAULT 'system'::text CHECK (theme_preference = ANY (ARRAY['light'::text, 'dark'::text, 'system'::text])),
+  employment_status USER-DEFINED NOT NULL DEFAULT 'trainee'::employment_status_enum,
+  account_status USER-DEFINED NOT NULL DEFAULT 'active'::account_status_enum,
   CONSTRAINT users_pkey PRIMARY KEY (id),
   CONSTRAINT users_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id),
   CONSTRAINT users_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id),

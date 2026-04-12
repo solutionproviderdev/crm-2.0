@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { getUserById } from "@/app/actions/users";
+import { getEmployeeById } from "@/lib/supabase/employees";
+import { getCurrentUser } from "@/app/actions/auth";
 import { UserProfileClient } from "@/components/users/UserProfileClient";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -10,11 +11,11 @@ interface Props {
 
 export async function generateMetadata({ params }: Props) {
   const { userId } = await params;
-  const result = await getUserById(userId);
+  const result = await getEmployeeById(userId);
   return {
     title: result.success
       ? `${result.data.name} | EaseIT CRM`
-      : "User Profile | EaseIT CRM",
+      : "Employee Profile | EaseIT CRM",
   };
 }
 
@@ -26,9 +27,16 @@ export async function generateMetadata({ params }: Props) {
  * that must not be called at the page shell level in Next.js 16.
  */
 async function UserContent({ userId }: { userId: string }) {
-  const result = await getUserById(userId);
+  const [result, currentUser] = await Promise.all([
+    getEmployeeById(userId),
+    getCurrentUser(),
+  ]);
+  
   if (!result.success) notFound();
-  return <UserProfileClient user={result.data} />;
+  
+  const isAdmin = currentUser?.type === "Admin";
+  
+  return <UserProfileClient user={result.data} isAdmin={isAdmin} />;
 }
 
 /**

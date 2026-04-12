@@ -34,3 +34,5 @@ export {
   completeMeeting,
   markAsSold
 } from "./meetings";
+
+export { getPipelineLeads } from "./pipeline";

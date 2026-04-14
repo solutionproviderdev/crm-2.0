@@ -4,6 +4,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { CACHE_TAGS } from "@/lib/cache-tags";
+import { logLeadActivity } from "@/lib/lead-activity-logger";
 import { addLeadComment } from "./mutations";
 import type { ActionResult, Lead, LeadMeeting } from "@/lib/types";
 
@@ -27,6 +28,8 @@ export async function createMeeting(
 ): Promise<ActionResult<LeadMeeting>> {
   const supabase = await getUserClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+
   const { data, error } = await supabase
     .from("lead_meetings")
     .insert([input])
@@ -46,6 +49,18 @@ export async function createMeeting(
     updateTag(CACHE_TAGS.LEADS);
     revalidatePath(`/leads/${data.lead_id}`);
     revalidatePath("/leads");
+
+    logLeadActivity({
+      leadId: data.lead_id,
+      actorId: user?.id,
+      action: "lead.meeting_created",
+      metadata: {
+        meetingId: data.id,
+        date: data.date,
+        slot: data.slot,
+        salesExecutiveId: data.sales_executive_id,
+      },
+    });
   }
 
   updateTag(CACHE_TAGS.MEETINGS);
@@ -70,6 +85,15 @@ export async function updateMeetingSchedule(
 ): Promise<ActionResult<LeadMeeting>> {
   const supabase = await getUserClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Capture old slot/exec before updating for the diff
+  const { data: prev } = await supabase
+    .from("lead_meetings")
+    .select("slot, sales_executive_id, lead_id")
+    .eq("id", meetingId)
+    .single();
+
   const { data, error } = await supabase
     .from("lead_meetings")
     .update({ sales_executive_id: salesExecutiveId, slot })
@@ -89,6 +113,17 @@ export async function updateMeetingSchedule(
     updateTag(CACHE_TAGS.LEADS);
     revalidatePath(`/leads/${data.lead_id}`);
     revalidatePath("/leads");
+
+    logLeadActivity({
+      leadId: data.lead_id,
+      actorId: user?.id,
+      action: "lead.meeting_rescheduled",
+      metadata: {
+        meetingId,
+        from: { slot: prev?.slot, salesExecutiveId: prev?.sales_executive_id },
+        to: { slot, salesExecutiveId },
+      },
+    });
   }
 
   updateTag(CACHE_TAGS.MEETINGS);
@@ -118,6 +153,15 @@ export async function updateMeetingStatus(
 ): Promise<ActionResult<LeadMeeting>> {
   const supabase = await getUserClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Capture old status for the diff
+  const { data: prev } = await supabase
+    .from("lead_meetings")
+    .select("status")
+    .eq("id", meetingId)
+    .single();
+
   const updateData: Record<string, unknown> = { status };
   if (payload?.date) updateData.date = payload.date;
   if (payload?.slot) updateData.slot = payload.slot;
@@ -135,7 +179,22 @@ export async function updateMeetingStatus(
 
   if (error) return { success: false, error: error.message };
 
-  if (data?.lead_id) revalidatePath(`/leads/${data.lead_id}`);
+  if (data?.lead_id) {
+    revalidatePath(`/leads/${data.lead_id}`);
+
+    logLeadActivity({
+      leadId: data.lead_id,
+      actorId: user?.id,
+      action: "lead.meeting_status_changed",
+      metadata: {
+        meetingId,
+        from: prev?.status,
+        to: status,
+        reason: payload?.reason,
+      },
+    });
+  }
+
   updateTag(CACHE_TAGS.MEETINGS);
   revalidatePath("/meetings/slots");
 
@@ -162,6 +221,7 @@ export async function deleteMeeting(
   updateTag(CACHE_TAGS.MEETINGS);
   revalidatePath("/meetings/slots");
 
+  // No activity log for deletions — the referenced meetingId would be gone
   return { success: true, data: true };
 }
 
@@ -237,6 +297,25 @@ export async function bookNewMeeting(params: {
   revalidatePath("/meetings/slots");
   revalidatePath(`/leads/${lead.id}`);
 
+  // Fire-and-forget activity logs
+  logLeadActivity({
+    leadId: lead.id,
+    actorId: user.id,
+    action: "lead.created",
+    metadata: { source: params.leadData.source, name: params.leadData.name },
+  });
+  logLeadActivity({
+    leadId: lead.id,
+    actorId: user.id,
+    action: "lead.meeting_created",
+    metadata: {
+      meetingId: meeting.id,
+      date: params.meetingData.date,
+      slot: params.meetingData.slot,
+      salesExecutiveId: params.meetingData.sales_executive_id,
+    },
+  });
+
   return {
     success: true,
     data: { lead: lead as Lead, meeting: meeting as LeadMeeting },
@@ -272,6 +351,13 @@ export async function fixMeetingForLead(params: {
   } = await supabase.auth.getUser();
   if (!user) return { success: false, error: "Not authenticated" };
 
+  // Fetch previous status for diff
+  const { data: prev } = await supabase
+    .from("leads")
+    .select("status")
+    .eq("id", params.leadId)
+    .single();
+
   // Step 1: Update the Lead
   const { error: lErr } = await supabase
     .from("leads")
@@ -305,6 +391,25 @@ export async function fixMeetingForLead(params: {
   updateTag(CACHE_TAGS.MEETINGS);
   revalidatePath(`/leads/${params.leadId}`);
   revalidatePath("/meetings/slots");
+
+  // Fire-and-forget activity logs
+  logLeadActivity({
+    leadId: params.leadId,
+    actorId: user.id,
+    action: "lead.status_changed",
+    metadata: { from: prev?.status, to: "Meeting Fixed" },
+  });
+  logLeadActivity({
+    leadId: params.leadId,
+    actorId: user.id,
+    action: "lead.meeting_created",
+    metadata: {
+      meetingId: meeting.id,
+      date: params.meetingData.date,
+      slot: params.meetingData.slot,
+      salesExecutiveId: params.meetingData.sales_executive_id,
+    },
+  });
 
   return { success: true, data: meeting as LeadMeeting };
 }
@@ -360,6 +465,23 @@ export async function completeMeeting(params: {
   revalidatePath(`/leads/${params.leadId}`);
   revalidatePath("/meetings/slots");
 
+  logLeadActivity({
+    leadId: params.leadId,
+    actorId: user.id,
+    action: "lead.meeting_completed",
+    metadata: {
+      meetingId: params.meetingId,
+      projectValue: params.projectValue,
+      clientsBudget: params.clientsBudget,
+    },
+  });
+  logLeadActivity({
+    leadId: params.leadId,
+    actorId: user.id,
+    action: "lead.status_changed",
+    metadata: { to: "Meeting Complete" },
+  });
+
   return { success: true, data: true };
 }
 
@@ -371,18 +493,6 @@ export async function completeMeeting(params: {
  * in a single PostgreSQL transaction. Finance totals (totalPayment, totalDue)
  * are now computed dynamically from `lead_payments` via the `lead_finance_computed`
  * view — NOT stored in the JSONB `finance` column.
- *
- * @param params.meetingId - Meeting UUID to mark as Sold
- * @param params.leadId - Associated lead UUID
- * @param params.projectValue - Final confirmed project value
- * @param params.soldAmount - Amount the deal was closed at
- * @param params.clientsBudget - Client's stated budget
- * @param params.soldDate - Date the deal was closed (ISO date string)
- * @param params.paymentAmount - Initial payment amount (0 if no payment yet)
- * @param params.paymentMethod - Payment method (Cash, Cheque, Bank Transfer, etc.)
- * @param params.paymentNote - Optional note about the payment
- * @param params.nextFollowUpTime - ISO timestamp for next follow-up
- * @param params.comment - Required closing note for the activity feed
  */
 export async function markAsSold(params: {
   meetingId: string;
@@ -429,6 +539,26 @@ export async function markAsSold(params: {
   updateTag(CACHE_TAGS.LEAD_STATUS_COUNTS);
   revalidatePath(`/leads/${params.leadId}`);
   revalidatePath("/meetings/slots");
+
+  logLeadActivity({
+    leadId: params.leadId,
+    actorId: user.id,
+    action: "lead.sold",
+    metadata: {
+      meetingId: params.meetingId,
+      projectValue: params.projectValue,
+      soldAmount: params.soldAmount,
+      soldDate: params.soldDate,
+      paymentAmount: params.paymentAmount,
+      paymentMethod: params.paymentMethod,
+    },
+  });
+  logLeadActivity({
+    leadId: params.leadId,
+    actorId: user.id,
+    action: "lead.status_changed",
+    metadata: { to: "Sold" },
+  });
 
   return { success: true, data: true };
 }

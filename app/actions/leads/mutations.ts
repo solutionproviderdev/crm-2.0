@@ -4,6 +4,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { CACHE_TAGS } from "@/lib/cache-tags";
+import { logLeadActivity } from "@/lib/lead-activity-logger";
 import type {
   ActionResult,
   Lead,
@@ -37,6 +38,8 @@ export async function createLead(
 ): Promise<ActionResult<Lead>> {
   const supabase = await getUserClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+
   const { data, error } = await supabase
     .from("leads")
     .insert([input])
@@ -49,6 +52,14 @@ export async function createLead(
   updateTag(CACHE_TAGS.LEAD_STATUS_COUNTS);
   revalidatePath("/leads");
 
+  // Fire-and-forget: log the creation
+  logLeadActivity({
+    leadId: data.id,
+    actorId: user?.id,
+    action: "lead.created",
+    metadata: { source: input.source, name: input.name },
+  });
+
   return { success: true, data: data as Lead };
 }
 
@@ -56,6 +67,12 @@ export async function createLead(
  * Updates specific fields on a lead. Uses `UpdateLeadInput` (not `Partial<Lead>`)
  * to ensure only real DB columns are sent — prevents accidental submission of
  * joined relation objects like `sales_executive` or `comments`.
+ *
+ * Automatically detects and logs the most meaningful change:
+ *   status change → "lead.status_changed"
+ *   cre_id change → "lead.assigned.cre"
+ *   sales_executive_id change → "lead.assigned.sales"
+ *   anything else → no activity log (minor field edits)
  *
  * @param id - Lead UUID
  * @param input - Only the fields to update
@@ -65,6 +82,21 @@ export async function updateLead(
   input: UpdateLeadInput
 ): Promise<ActionResult<Lead>> {
   const supabase = await getUserClient();
+
+  // Fetch current values BEFORE update for meaningful diff in logs
+  // Only fetch if we're changing a tracked field (status, assignments)
+  const isTrackedChange = "status" in input || "cre_id" in input || "sales_executive_id" in input;
+  let prevData: Partial<Lead> = {};
+  if (isTrackedChange) {
+    const { data: prev } = await supabase
+      .from("leads")
+      .select("status, cre_id, sales_executive_id")
+      .eq("id", id)
+      .single();
+    prevData = prev ?? {};
+  }
+
+  const { data: { user } } = await supabase.auth.getUser();
 
   const { data, error } = await supabase
     .from("leads")
@@ -80,6 +112,38 @@ export async function updateLead(
   updateTag(CACHE_TAGS.LEAD_STATUS_COUNTS);
   revalidatePath("/leads");
   revalidatePath(`/leads/${id}`);
+
+  // Fire-and-forget activity logs (one per tracked change)
+  if ("status" in input && input.status !== prevData.status) {
+    logLeadActivity({
+      leadId: id,
+      actorId: user?.id,
+      action: "lead.status_changed",
+      metadata: { from: prevData.status, to: input.status },
+    });
+  }
+  if ("cre_id" in input && input.cre_id !== prevData.cre_id) {
+    logLeadActivity({
+      leadId: id,
+      actorId: user?.id,
+      action: "lead.assigned.cre",
+      metadata: { from: prevData.cre_id, to: input.cre_id },
+    });
+  }
+  if (
+    "sales_executive_id" in input &&
+    input.sales_executive_id !== prevData.sales_executive_id
+  ) {
+    logLeadActivity({
+      leadId: id,
+      actorId: user?.id,
+      action: "lead.assigned.sales",
+      metadata: {
+        from: prevData.sales_executive_id,
+        to: input.sales_executive_id,
+      },
+    });
+  }
 
   return { success: true, data: data as Lead };
 }
@@ -108,6 +172,8 @@ export async function addLeadPhone(
     return { success: false, error: "Phone number already exists" };
   }
 
+  const { data: { user } } = await supabase.auth.getUser();
+
   const { data, error } = await supabase
     .from("leads")
     .update({ phones: [...currentPhones, phone] })
@@ -119,6 +185,13 @@ export async function addLeadPhone(
 
   updateTag(CACHE_TAGS.LEAD_DETAILS(leadId));
   revalidatePath(`/leads/${leadId}`);
+
+  logLeadActivity({
+    leadId,
+    actorId: user?.id,
+    action: "lead.phone_added",
+    metadata: { phone },
+  });
 
   return { success: true, data: data as Lead };
 }
@@ -138,6 +211,8 @@ export async function bulkAssignLeads(
 ): Promise<ActionResult<boolean>> {
   const supabase = await getUserClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+
   const updateData =
     type === "cre"
       ? { cre_id: userId }
@@ -153,6 +228,16 @@ export async function bulkAssignLeads(
   updateTag(CACHE_TAGS.LEADS);
   leadIds.forEach((id) => updateTag(CACHE_TAGS.LEAD_DETAILS(id)));
   revalidatePath("/leads");
+
+  // One log entry per lead (fire-and-forget, all non-blocking)
+  for (const leadId of leadIds) {
+    logLeadActivity({
+      leadId,
+      actorId: user?.id,
+      action: "lead.assigned.bulk",
+      metadata: { assignedUserId: userId, role: type, totalInBatch: leadIds.length },
+    });
+  }
 
   return { success: true, data: true };
 }
@@ -195,6 +280,13 @@ export async function addLeadComment(
   updateTag(CACHE_TAGS.LEAD_DETAILS(leadId));
   revalidatePath(`/leads/${leadId}`);
 
+  logLeadActivity({
+    leadId,
+    actorId: user.id,
+    action: "lead.comment_added",
+    metadata: { hasImages: images.length > 0, imageCount: images.length },
+  });
+
   return { success: true, data: data as LeadComment };
 }
 
@@ -229,6 +321,17 @@ export async function addPayment(
   updateTag(CACHE_TAGS.LEAD_DETAILS(input.lead_id || ""));
   revalidatePath(`/leads/${input.lead_id}`);
 
+  logLeadActivity({
+    leadId: input.lead_id!,
+    actorId: user?.id,
+    action: "lead.payment_recorded",
+    metadata: {
+      amount: input.amount,
+      method: input.payment_method,
+      status: input.payment_status,
+    },
+  });
+
   return { success: true, data: data as LeadPayment };
 }
 
@@ -259,6 +362,17 @@ export async function addCallLog(
   updateTag(CACHE_TAGS.LEAD_DETAILS(input.lead_id || ""));
   revalidatePath(`/leads/${input.lead_id}`);
 
+  logLeadActivity({
+    leadId: input.lead_id!,
+    actorId: user?.id,
+    action: "lead.call_logged",
+    metadata: {
+      callType: input.call_type,
+      status: input.status,
+      recipient: input.recipient_number,
+    },
+  });
+
   return { success: true, data: data as LeadCallLog };
 }
 
@@ -279,6 +393,15 @@ export async function updateLeadProjectStatus(
 ): Promise<ActionResult<boolean>> {
   const supabase = await getUserClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Fetch current project status for the diff
+  const { data: prev } = await supabase
+    .from("leads")
+    .select("project_status")
+    .eq("id", leadId)
+    .single();
+
   const { error } = await supabase
     .from("leads")
     .update({
@@ -296,8 +419,19 @@ export async function updateLeadProjectStatus(
   updateTag(CACHE_TAGS.LEAD_STATUS_COUNTS);
   revalidatePath(`/leads/${leadId}`);
 
+  logLeadActivity({
+    leadId,
+    actorId: user?.id,
+    action: "lead.project_status_changed",
+    metadata: {
+      from: prev?.project_status,
+      to: { status, subStatus },
+    },
+  });
+
   return { success: true, data: true };
 }
+
 /**
  * Bulk-creates multiple lead records in a single transaction.
  *
@@ -310,6 +444,8 @@ export async function createLeadsBulk(
 
   const supabase = await getUserClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+
   const { data, error } = await supabase
     .from("leads")
     .insert(leads)
@@ -321,12 +457,22 @@ export async function createLeadsBulk(
   updateTag(CACHE_TAGS.LEAD_STATUS_COUNTS);
   revalidatePath("/leads");
 
-  return { 
-    success: true, 
-    data: { 
-      inserted: data?.length || 0, 
-      failed: leads.length - (data?.length || 0) 
-    } 
+  // Log one entry per created lead (fire-and-forget)
+  for (const row of data ?? []) {
+    logLeadActivity({
+      leadId: row.id,
+      actorId: user?.id,
+      action: "lead.created",
+      metadata: { importedInBulk: true },
+    });
+  }
+
+  return {
+    success: true,
+    data: {
+      inserted: data?.length || 0,
+      failed: leads.length - (data?.length || 0),
+    },
   };
 }
 
@@ -344,6 +490,8 @@ export async function updateFollowUpStatus(
 ): Promise<ActionResult<boolean>> {
   const supabase = await getUserClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+
   const { error } = await supabase
     .from("lead_follow_ups")
     .update({ status })
@@ -353,6 +501,13 @@ export async function updateFollowUpStatus(
 
   updateTag(CACHE_TAGS.LEAD_DETAILS(leadId));
   revalidatePath(`/leads/${leadId}`);
+
+  logLeadActivity({
+    leadId,
+    actorId: user?.id,
+    action: "lead.follow_up_updated",
+    metadata: { followUpId: id, newStatus: status },
+  });
 
   return { success: true, data: true };
 }
@@ -367,6 +522,8 @@ export async function createFollowUp(
 ): Promise<ActionResult<LeadFollowUp>> {
   const supabase = await getUserClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+
   const { data, error } = await supabase
     .from("lead_follow_ups")
     .insert([input])
@@ -377,6 +534,13 @@ export async function createFollowUp(
 
   updateTag(CACHE_TAGS.LEAD_DETAILS(input.lead_id || ""));
   revalidatePath(`/leads/${input.lead_id}`);
+
+  logLeadActivity({
+    leadId: input.lead_id!,
+    actorId: user?.id,
+    action: "lead.follow_up_created",
+    metadata: { type: input.type, scheduledAt: input.time, assignedTo: input.assigned_to },
+  });
 
   return { success: true, data: data as LeadFollowUp };
 }

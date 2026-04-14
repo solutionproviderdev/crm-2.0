@@ -6,6 +6,7 @@ import { CACHE_TAGS } from "@/lib/cache-tags";
 import type {
   ActionResult,
   Lead,
+  LeadActivityLog,
   LeadMeeting,
   MeetingSlot,
   User,
@@ -444,4 +445,38 @@ export async function getMeetingsByDateRange(params: {
   const { data, error } = await query;
   if (error) return { success: false, error: error.message };
   return { success: true, data: data as LeadMeeting[] };
+}
+
+/**
+ * Fetches the full activity log for a single lead, ordered newest-first.
+ * Used to render the audit trail / timeline on the Lead Details page.
+ *
+ * Each log entry includes the `actor` (user who performed the action)
+ * with their name and avatar for display purposes.
+ *
+ * @param leadId - The lead UUID to fetch activity for
+ */
+export async function getLeadActivityLogs(
+  leadId: string
+): Promise<ActionResult<LeadActivityLog[]>> {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag(CACHE_TAGS.LEAD_ACTIVITY(leadId));
+
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase
+    .from("lead_activity_logs")
+    .select(
+      `
+      *,
+      actor:users!lead_activity_logs_actor_id_fkey(id, name, profile_picture)
+    `
+    )
+    .eq("lead_id", leadId)
+    .order("created_at", { ascending: false })
+    .limit(100); // cap at 100 per load; implement pagination later if needed
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, data: data as LeadActivityLog[] };
 }

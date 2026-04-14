@@ -91,6 +91,21 @@ export interface UserActivityLog {
   created_at: string;
 }
 
+export interface LeadActivityLog {
+  id: string;
+  lead_id: string;
+  actor_id: string | null;
+  /** Typed action identifier, e.g. "lead.status_changed" */
+  action: string;
+  /** Structured context: old/new values, amounts, assignees, etc. */
+  metadata: Record<string, unknown>;
+  created_at: string;
+  // joined
+  actor?: Pick<User, "id" | "name" | "profile_picture"> | null;
+  lead?: Pick<Lead, "id" | "name" | "cid"> | null;
+}
+
+
 // ── Form Input Types ────────────────────────────────────────────────────────
 
 export interface CreateUserInput {

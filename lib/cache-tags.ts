@@ -12,6 +12,7 @@ export const CACHE_TAGS = {
   LEADS: "leads",
   LEAD_DETAILS: (id: string) => `lead:${id}`,
   LEAD_STATUS_COUNTS: "leads:status-counts",
+  LEAD_ACTIVITY: (leadId: string) => `lead:${leadId}:activity`,
 
   // ── Meeting data ────────────────────────────────────────────────────────
   MEETINGS: "meetings",

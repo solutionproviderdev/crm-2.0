@@ -3,6 +3,7 @@ export {
   getLeadFilterOptions,
   getLeadStatusCounts,
   getLeadDetails,
+  getLeadActivityLogs,
   getMeetingSlots,
   getAllActiveUsers,
   getSalesTeamMembers,

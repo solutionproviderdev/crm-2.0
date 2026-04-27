@@ -36,6 +36,10 @@ export const ALL_PERMISSIONS = [
     resource: "Pipelines",
     actions: ["Client Pipeline", "Project Pipeline"],
   },
+  {
+    resource: "Transform Studio",
+    actions: ["Use Transform Studio", "Review & Approve Jobs", "Admin"],
+  },
 ] as const;
 
 export type PermissionResource = (typeof ALL_PERMISSIONS)[number]["resource"];
@@ -79,6 +83,10 @@ export const PERMISSION_ROUTE_MAP: Record<string, string> = {
   // Pipelines
   "Pipelines:Client Pipeline": "/clients",
   "Pipelines:Project Pipeline": "/projects",
+  // Transform Studio
+  "Transform Studio:Use Transform Studio": "/transform",
+  "Transform Studio:Review & Approve Jobs": "/transform",
+  "Transform Studio:Admin": "/settings/ai-providers",
 };
 
 /** Build a flat set of allowed route prefixes from a permissions map */

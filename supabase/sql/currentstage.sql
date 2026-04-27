@@ -51,6 +51,17 @@ CREATE TABLE public.divisions (
   updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   CONSTRAINT divisions_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.lead_activity_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  lead_id uuid NOT NULL,
+  actor_id uuid,
+  action text NOT NULL,
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT lead_activity_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT lead_activity_logs_lead_id_fkey FOREIGN KEY (lead_id) REFERENCES public.leads(id),
+  CONSTRAINT lead_activity_logs_actor_id_fkey FOREIGN KEY (actor_id) REFERENCES public.users(id)
+);
 CREATE TABLE public.lead_call_logs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   lead_id uuid NOT NULL,
@@ -190,6 +201,81 @@ CREATE TABLE public.site_settings (
   updated_by uuid,
   CONSTRAINT site_settings_pkey PRIMARY KEY (id),
   CONSTRAINT site_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id)
+);
+CREATE TABLE public.transform_ai_models (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  provider_id uuid NOT NULL,
+  model_id text NOT NULL,
+  display_name text NOT NULL,
+  supports_inpainting boolean NOT NULL DEFAULT true,
+  cost_per_image_usd numeric NOT NULL,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT transform_ai_models_pkey PRIMARY KEY (id),
+  CONSTRAINT transform_ai_models_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.transform_ai_providers(id)
+);
+CREATE TABLE public.transform_ai_providers (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  provider_key text NOT NULL UNIQUE,
+  api_key_encrypted text NOT NULL,
+  is_active boolean NOT NULL DEFAULT true,
+  added_by uuid,
+  created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT transform_ai_providers_pkey PRIMARY KEY (id),
+  CONSTRAINT transform_ai_providers_added_by_fkey FOREIGN KEY (added_by) REFERENCES public.users(id)
+);
+CREATE TABLE public.transform_generation_steps (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  job_id uuid NOT NULL,
+  step_name text NOT NULL,
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'running'::text, 'done'::text, 'failed'::text])),
+  prompt_used text,
+  result_path text,
+  cost_usd numeric,
+  images_generated integer DEFAULT 1,
+  error_message text,
+  started_at timestamp with time zone,
+  completed_at timestamp with time zone,
+  CONSTRAINT transform_generation_steps_pkey PRIMARY KEY (id),
+  CONSTRAINT transform_generation_steps_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.transform_jobs(id)
+);
+CREATE TABLE public.transform_jobs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  job_number integer NOT NULL DEFAULT nextval('transform_jobs_job_number_seq'::regclass) UNIQUE,
+  created_by uuid NOT NULL,
+  status text NOT NULL DEFAULT 'draft'::text CHECK (status = ANY (ARRAY['draft'::text, 'queued'::text, 'processing'::text, 'review'::text, 'approved'::text, 'failed'::text])),
+  current_step text,
+  preset_id uuid,
+  config_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
+  source_file_path text,
+  zones jsonb DEFAULT '{}'::jsonb,
+  output_image_path text,
+  ai_model_id uuid,
+  total_cost_usd numeric,
+  duration_seconds integer,
+  reviewer_id uuid,
+  review_comment text,
+  reviewed_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT transform_jobs_pkey PRIMARY KEY (id),
+  CONSTRAINT transform_jobs_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
+  CONSTRAINT transform_jobs_preset_id_fkey FOREIGN KEY (preset_id) REFERENCES public.transform_presets(id),
+  CONSTRAINT transform_jobs_ai_model_id_fkey FOREIGN KEY (ai_model_id) REFERENCES public.transform_ai_models(id),
+  CONSTRAINT transform_jobs_reviewer_id_fkey FOREIGN KEY (reviewer_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.transform_presets (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  is_system boolean NOT NULL DEFAULT false,
+  created_by uuid,
+  config jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT transform_presets_pkey PRIMARY KEY (id),
+  CONSTRAINT transform_presets_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
 );
 CREATE TABLE public.user_activity_logs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

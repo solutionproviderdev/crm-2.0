@@ -1,0 +1,7 @@
+project_id = "rjmoymvqjykjaujptaof"
+
+[functions.transform-process-zone]
+verify_jwt = false
+
+[functions.transform-composite]
+verify_jwt = false

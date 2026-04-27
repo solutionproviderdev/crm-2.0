@@ -44,7 +44,8 @@ export function EditEmployeeForm({ employee, isAdmin, departments, roles }: Prop
       const result = await updateEmployee(employee.id, {
         name:              fd.get("name") as string,
         nickname:          fd.get("nickname") as string || undefined,
-        type:              fd.get("type") as UserType,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        type:              fd.get("type") as any,
         employment_status: fd.get("employment_status") as EmploymentStatusValue,
         account_status:    account_status,
         personal_phone:    fd.get("personal_phone") as string || undefined,
@@ -60,7 +61,8 @@ export function EditEmployeeForm({ employee, isAdmin, departments, roles }: Prop
         guardian_name:     fd.get("guardian_name") as string || undefined,
         guardian_phone:    fd.get("guardian_phone") as string || undefined,
         guardian_relation: fd.get("guardian_relation") as string || undefined,
-      });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
 
       if (!result.success) {
         setError(result.error);

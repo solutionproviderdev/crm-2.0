@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { User, ShieldCheck, Building2, ChevronRight } from "lucide-react";
+import { User, ShieldCheck, Building2, ChevronRight, Cpu } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useUser } from "@/components/providers/UserProvider";
 
@@ -35,6 +35,12 @@ export default function SettingsLayout({
             href: "/settings/company",
             icon: Building2,
             description: "Branding and site config",
+          },
+          {
+            name: "AI Providers",
+            href: "/settings/ai-providers",
+            icon: Cpu,
+            description: "OpenAI and model credentials",
           },
         ]
       : []),

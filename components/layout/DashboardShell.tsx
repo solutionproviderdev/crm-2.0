@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LayoutDashboard, Users, Bell, MessagesSquare, CalendarDays, Wrench, Handshake, Construction } from 'lucide-react';
+import { LayoutDashboard, Users, Bell, MessagesSquare, CalendarDays, Wrench, Handshake, Construction, Wand2 } from 'lucide-react';
 import { logout } from '@/app/actions/auth';
 import type { User } from '@/lib/types';
 import type { PermissionMap } from '@/lib/permissions';
@@ -27,6 +27,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
 	{ name: 'Meetings', href: '/meetings/slots', alternateHrefs: ['/meetings'], icon: CalendarDays },
 	{ name: 'Users', href: '/users', alternateHrefs: ['/users/departments', '/users/roles'], icon: Users },
 	{ name: 'Chat', href: '/chat', icon: MessagesSquare },
+	{ name: 'Transform Studio', href: '/transform', icon: Wand2 },
 	{ name: 'Utility', href: '/utility/map', icon: Wrench },
 ];
 

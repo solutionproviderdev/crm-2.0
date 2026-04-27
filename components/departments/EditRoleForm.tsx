@@ -103,7 +103,7 @@ export function EditRoleForm({ role, departments }: Props) {
               <label htmlFor="role-dept" className="block text-sm font-medium text-gray-700 mb-1.5">
                 Department <span className="text-red-400">*</span>
               </label>
-              <select id="role-dept" name="department_id" required defaultValue={role.department_id} className="role-field">
+              <select id="role-dept" name="department_id" required defaultValue={role.department_id ?? undefined} className="role-field">
                 <option value="">— Select department —</option>
                 {departments.map((d) => (
                   <option key={d.id} value={d.id}>{d.name}</option>

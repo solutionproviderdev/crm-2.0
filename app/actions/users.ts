@@ -1,9 +1,10 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, cacheLife, cacheTag, updateTag } from "next/cache";
 import { createClient as createStandardClient } from "@/utils/supabase/server";
-import { createAdminClient as createServiceRoleClient } from "@/utils/supabase/admin";
+import { createAdminClient } from "@/utils/supabase/admin";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import type {
   ActionResult,
   User,
@@ -18,12 +19,12 @@ async function getStandardClient() {
   return createStandardClient(cookieStore);
 }
 
-// 🛡️ SECURITY: Only use Service Role client AFTER explicitly checking if 
+// 🛡️ SECURITY: Only use Service Role client AFTER explicitly checking if
 // the requesting user is an Admin at the application level.
 async function getServiceRoleClient() {
   const supabase = await getStandardClient();
   const { data: { user: authUser } } = await supabase.auth.getUser();
-  
+
   if (!authUser) throw new Error("Unauthorized");
 
   const { data: user } = await supabase
@@ -36,11 +37,21 @@ async function getServiceRoleClient() {
     throw new Error("Administrative privileges required");
   }
 
-  return createServiceRoleClient();
+  return createAdminClient();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Reads — cached with admin client (stateless, no cookies)
+// RLS note: all authenticated users can SELECT from public.users (see phase1_migration.sql)
+// so reading via admin client does not expose data beyond what RLS would allow.
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function getUsers(): Promise<ActionResult<User[]>> {
-  const supabase = await getStandardClient();
+  "use cache";
+  cacheLife("hours");
+  cacheTag(CACHE_TAGS.USERS_LIST);
+
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("users")
     .select(`
@@ -55,7 +66,11 @@ export async function getUsers(): Promise<ActionResult<User[]>> {
 }
 
 export async function getUserById(id: string): Promise<ActionResult<User>> {
-  const supabase = await getStandardClient();
+  "use cache";
+  cacheLife("minutes");
+  cacheTag(CACHE_TAGS.USER_DETAIL(id));
+
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("users")
     .select(`
@@ -72,12 +87,33 @@ export async function getUserById(id: string): Promise<ActionResult<User>> {
   return { success: true, data: data as User };
 }
 
+export async function getUserDropdownOptions(): Promise<
+  ActionResult<{ id: string; name: string; type: string }[]>
+> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag(CACHE_TAGS.USER_DROPDOWN);
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, name, type")
+    .eq("account_status", "active")
+    .order("name");
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, data: data || [] };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mutations — invalidate affected cache tags after every write
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function createUser(
   input: CreateUserInput
 ): Promise<ActionResult<User>> {
   const supabase = await getServiceRoleClient();
 
-  // 1. Create auth user (sends email invite or sets password)
   const { data: authData, error: authError } =
     await supabase.auth.admin.createUser({
       email: input.email,
@@ -93,14 +129,13 @@ export async function createUser(
     return { success: false, error: authError?.message || "Failed to create auth user" };
   }
 
-  // 2. Update the auto-created users row with full details
   const { data, error } = await supabase
     .from("users")
     .update({
       nickname:          input.nickname || null,
       type:              input.type,
-      account_status:    input.account_status || 'active',
-      employment_status: input.employment_status || 'trainee',
+      account_status:    input.account_status || "active",
+      employment_status: input.employment_status || "trainee",
       personal_phone:    input.personal_phone || null,
       office_phone:      input.office_phone || null,
       gender:            input.gender || null,
@@ -120,6 +155,11 @@ export async function createUser(
     .single();
 
   if (error) return { success: false, error: error.message };
+
+  updateTag(CACHE_TAGS.USERS_LIST);
+  updateTag(CACHE_TAGS.USER_DROPDOWN);
+  revalidatePath("/users");
+
   return { success: true, data: data as User };
 }
 
@@ -136,6 +176,11 @@ export async function updateUser(
     .single();
 
   if (error) return { success: false, error: error.message };
+
+  updateTag(CACHE_TAGS.USERS_LIST);
+  updateTag(CACHE_TAGS.USER_DETAIL(id));
+  updateTag(CACHE_TAGS.USER_DROPDOWN);
+
   return { success: true, data: data as User };
 }
 
@@ -155,6 +200,11 @@ export async function updateUserStatuses(
     .eq("id", id);
 
   if (error) return { success: false, error: error.message };
+
+  updateTag(CACHE_TAGS.USERS_LIST);
+  updateTag(CACHE_TAGS.USER_DETAIL(id));
+  updateTag(CACHE_TAGS.USER_DROPDOWN);
+
   return { success: true, data: null };
 }
 
@@ -162,6 +212,11 @@ export async function deleteUser(id: string): Promise<ActionResult<null>> {
   const supabase = await getServiceRoleClient();
   const { error } = await supabase.auth.admin.deleteUser(id);
   if (error) return { success: false, error: error.message };
+
+  updateTag(CACHE_TAGS.USERS_LIST);
+  updateTag(CACHE_TAGS.USER_DETAIL(id));
+  updateTag(CACHE_TAGS.USER_DROPDOWN);
+
   return { success: true, data: null };
 }
 
@@ -182,7 +237,6 @@ export async function updateOwnPassword(
   newPassword: string
 ): Promise<ActionResult<null>> {
   const supabase = await getStandardClient();
-  // Re-authenticate with current password first
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) return { success: false, error: "Not authenticated" };
 
@@ -221,21 +275,11 @@ export async function updateProfilePicture(
     .eq("id", userId);
 
   if (updateError) return { success: false, error: updateError.message };
+
+  updateTag(CACHE_TAGS.USER_DETAIL(userId));
+  updateTag(CACHE_TAGS.USERS_LIST);
+
   return { success: true, data: publicUrl };
-}
-
-export async function getUserDropdownOptions(): Promise<
-  ActionResult<{ id: string; name: string; type: string }[]>
-> {
-  const supabase = await getStandardClient();
-  const { data, error } = await supabase
-    .from("users")
-    .select("id, name, type")
-    .eq("account_status", "active")
-    .order("name");
-
-  if (error) return { success: false, error: error.message };
-  return { success: true, data: data || [] };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -261,10 +305,8 @@ export async function bulkCreateUsers(
   const result:  BulkImportResult = { succeeded: 0, failed: [] };
 
   for (const row of rows) {
-    // Only process valid rows — safety net (dialog already filters)
     if (!row.valid) continue;
 
-    // ── Step 1: Create auth user ──────────────────────────────────────────
     const { data: authData, error: authError } =
       await supabase.auth.admin.createUser({
         email:           row.email,
@@ -283,9 +325,6 @@ export async function bulkCreateUsers(
 
     const authUserId = authData.user.id;
 
-    // ── Step 2: Insert public.users profile ───────────────────────────────
-    // Supabase trigger already inserts a bare row on auth.users insert.
-    // We UPDATE (same as single createUser) instead of INSERT to avoid conflicts.
     const { error: profileError } = await supabase
       .from("users")
       .update({
@@ -311,7 +350,6 @@ export async function bulkCreateUsers(
       .eq("id", authUserId);
 
     if (profileError) {
-      // Rollback: delete auth user so no ghost account remains
       await supabase.auth.admin.deleteUser(authUserId);
       result.failed.push({
         email: row.email,
@@ -323,6 +361,8 @@ export async function bulkCreateUsers(
     result.succeeded++;
   }
 
+  updateTag(CACHE_TAGS.USERS_LIST);
+  updateTag(CACHE_TAGS.USER_DROPDOWN);
   revalidatePath("/users");
   revalidatePath("/dashboard");
 

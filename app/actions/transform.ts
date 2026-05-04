@@ -3,7 +3,8 @@
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { cookies } from 'next/headers'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, cacheLife, cacheTag, updateTag } from 'next/cache'
+import { CACHE_TAGS } from '@/lib/cache-tags'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -121,7 +122,7 @@ const OPENAI_IMAGE_EDIT_MODELS = [
 ] as const
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Job CRUD
+// Job CRUD (mutations)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -141,6 +142,8 @@ export async function createTransformJob(): Promise<{ success: true; jobId: stri
     .single()
 
   if (error || !data) return { success: false, error: error?.message ?? 'Failed to create job' }
+
+  updateTag(CACHE_TAGS.TRANSFORM_JOBS)
   return { success: true, jobId: data.id }
 }
 
@@ -160,6 +163,8 @@ export async function saveJobSourceFile(jobId: string, filePath: string): Promis
     .eq('created_by', user.id)
 
   if (error) return { success: false, error: error.message }
+
+  updateTag(CACHE_TAGS.TRANSFORM_JOB(jobId))
   return { success: true }
 }
 
@@ -182,6 +187,8 @@ export async function saveJobZones(
     .eq('created_by', user.id)
 
   if (error) return { success: false, error: error.message }
+
+  updateTag(CACHE_TAGS.TRANSFORM_JOB(jobId))
   return { success: true }
 }
 
@@ -199,7 +206,6 @@ export async function triggerGeneration(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Unauthorized' }
 
-  // Pre-create step rows in pending state so Realtime shows them immediately
   const steps = ['lower', 'middle', 'upper', 'composite']
   const { error: stepsErr } = await supabase
     .from('transform_generation_steps')
@@ -207,7 +213,6 @@ export async function triggerGeneration(
 
   if (stepsErr) {
     console.error('Failed to insert generation steps:', stepsErr.message)
-    // Non-fatal: the edge function will upsert these anyway
   }
 
   const { error: updateErr } = await supabase
@@ -231,7 +236,6 @@ export async function triggerGeneration(
   }
 
   // Fire-and-forget — the edge function chains itself asynchronously.
-  // Do NOT await; awaiting would hang the server action for 30–90 s (one full OpenAI call).
   fetch(`${edgeUrl}/transform-process-zone`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -240,6 +244,8 @@ export async function triggerGeneration(
     console.error('Failed to trigger edge function:', err)
   })
 
+  updateTag(CACHE_TAGS.TRANSFORM_JOBS)
+  updateTag(CACHE_TAGS.TRANSFORM_JOB(jobId))
   revalidatePath('/transform')
   return { success: true }
 }
@@ -264,6 +270,9 @@ export async function approveJob(jobId: string): Promise<{ success: boolean; err
     .eq('id', jobId)
 
   if (error) return { success: false, error: error.message }
+
+  updateTag(CACHE_TAGS.TRANSFORM_JOBS)
+  updateTag(CACHE_TAGS.TRANSFORM_JOB(jobId))
   revalidatePath('/transform')
   return { success: true }
 }
@@ -289,6 +298,9 @@ export async function rejectJob(jobId: string, comment: string): Promise<{ succe
     .eq('id', jobId)
 
   if (error) return { success: false, error: error.message }
+
+  updateTag(CACHE_TAGS.TRANSFORM_JOBS)
+  updateTag(CACHE_TAGS.TRANSFORM_JOB(jobId))
   revalidatePath('/transform')
   return { success: true }
 }
@@ -305,9 +317,6 @@ export async function regenerateZone(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Unauthorized' }
 
-  // Reset the requested zone AND every step that runs after it.
-  // Without this, the Edge Function skips already-done downstream steps
-  // and the composite uses the old upper result, so the user sees no change.
   const zoneOrder = ['lower', 'middle', 'upper', 'composite']
   const zoneIndex = zoneOrder.indexOf(zone)
   const stepsToReset = zoneOrder.slice(zoneIndex)
@@ -318,7 +327,6 @@ export async function regenerateZone(
     .eq('job_id', jobId)
     .in('step_name', stepsToReset)
 
-  // Clear the now-stale output so the before/after slider is hidden during re-run
   await supabase
     .from('transform_jobs')
     .update({
@@ -333,7 +341,6 @@ export async function regenerateZone(
   const edgeUrl = process.env.TRANSFORM_EDGE_FUNCTION_URL
   if (!edgeUrl || !process.env.SUPABASE_SERVICE_ROLE_KEY) return { success: false, error: 'Edge Function URL not configured' }
 
-  // Fire-and-forget — same pattern as triggerGeneration
   fetch(`${edgeUrl}/transform-process-zone`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -342,32 +349,42 @@ export async function regenerateZone(
     console.error('Failed to trigger regeneration:', err)
   })
 
+  updateTag(CACHE_TAGS.TRANSFORM_JOB(jobId))
   revalidatePath(`/transform/${jobId}`)
   return { success: true }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Job queries
+// Job queries (cached)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * List transform jobs for the current user.
- * Admins and reviewers see all jobs; operators see only their own.
+ * List transform jobs. Admins and reviewers see all; operators see only their own.
+ * Pass userId + isAdmin so the cache key is stable and user-scoped.
  */
-export async function getTransformJobs(statusFilter?: string): Promise<{
+export async function getTransformJobs(
+  statusFilter?: string,
+  userId?: string,
+  isAdmin = false
+): Promise<{
   success: boolean
   data?: TransformJob[]
   error?: string
 }> {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'Unauthorized' }
+  "use cache";
+  cacheLife("minutes");
+  cacheTag(CACHE_TAGS.TRANSFORM_JOBS);
+
+  const supabase = createAdminClient()
 
   let query = supabase
     .from('transform_jobs')
     .select('*, ai_model:transform_ai_models(id, model_id, display_name, cost_per_image_usd, provider:transform_ai_providers(id, name, provider_key))')
     .order('created_at', { ascending: false })
+
+  if (!isAdmin && userId) {
+    query = query.eq('created_by', userId)
+  }
 
   if (statusFilter && statusFilter !== 'all') {
     query = query.eq('status', statusFilter)
@@ -380,16 +397,18 @@ export async function getTransformJobs(statusFilter?: string): Promise<{
 
 /**
  * Get a single job by ID (with steps).
+ * Short TTL — Realtime keeps the UI live; this is the initial-load snapshot.
  */
 export async function getTransformJob(jobId: string): Promise<{
   success: boolean
   data?: TransformJob & { steps: TransformGenerationStep[] }
   error?: string
 }> {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'Unauthorized' }
+  "use cache";
+  cacheLife("seconds");
+  cacheTag(CACHE_TAGS.TRANSFORM_JOB(jobId));
+
+  const supabase = createAdminClient()
 
   const { data, error } = await supabase
     .from('transform_jobs')
@@ -410,6 +429,7 @@ export async function getTransformJob(jobId: string): Promise<{
 
 /**
  * Generate a signed URL for a storage file.
+ * NOT cached — signed URLs expire; serving a stale URL breaks image loading.
  */
 export async function getSignedUrl(
   bucket: string,
@@ -428,7 +448,7 @@ export async function getSignedUrl(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Preset queries
+// Preset queries (cached)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function getTransformPresets(): Promise<{
@@ -436,8 +456,11 @@ export async function getTransformPresets(): Promise<{
   data?: TransformPreset[]
   error?: string
 }> {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+  "use cache";
+  cacheLife("hours");
+  cacheTag(CACHE_TAGS.TRANSFORM_PRESETS);
+
+  const supabase = createAdminClient()
 
   const { data, error } = await supabase
     .from('transform_presets')
@@ -450,7 +473,7 @@ export async function getTransformPresets(): Promise<{
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AI Provider management (admin only)
+// AI Provider management
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function getAIProviders(): Promise<{
@@ -458,8 +481,11 @@ export async function getAIProviders(): Promise<{
   data?: TransformAIProvider[]
   error?: string
 }> {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+  "use cache";
+  cacheLife("hours");
+  cacheTag(CACHE_TAGS.AI_PROVIDERS);
+
+  const supabase = createAdminClient()
 
   const { data, error } = await supabase
     .from('transform_ai_providers')
@@ -475,8 +501,11 @@ export async function getAIModels(providerId?: string): Promise<{
   data?: TransformAIModel[]
   error?: string
 }> {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+  "use cache";
+  cacheLife("hours");
+  cacheTag(CACHE_TAGS.AI_MODELS);
+
+  const supabase = createAdminClient()
 
   let query = supabase
     .from('transform_ai_models')
@@ -502,7 +531,6 @@ export async function addAIProvider(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Unauthorized' }
 
-  // Use admin client to bypass RLS for admin operations validated at app layer
   const admin = createAdminClient()
 
   const { data: provider, error } = await admin
@@ -513,13 +541,14 @@ export async function addAIProvider(
 
   if (error || !provider) return { success: false, error: error?.message ?? 'Failed to add provider' }
 
-  // Seed default models for known providers
   if (providerKey === 'openai') {
     await admin.from('transform_ai_models').insert(
       OPENAI_IMAGE_EDIT_MODELS.map((model) => ({ ...model, provider_id: provider.id }))
     )
   }
 
+  updateTag(CACHE_TAGS.AI_PROVIDERS)
+  updateTag(CACHE_TAGS.AI_MODELS)
   revalidatePath('/settings/ai-providers')
   return { success: true }
 }
@@ -535,6 +564,8 @@ export async function toggleProvider(
     .eq('id', providerId)
 
   if (error) return { success: false, error: error.message }
+
+  updateTag(CACHE_TAGS.AI_PROVIDERS)
   revalidatePath('/settings/ai-providers')
   return { success: true }
 }
@@ -557,6 +588,7 @@ export async function seedModelsForProvider(
     if (error) return { success: false, error: error.message }
   }
 
+  updateTag(CACHE_TAGS.AI_MODELS)
   revalidatePath('/settings/ai-providers')
   return { success: true }
 }

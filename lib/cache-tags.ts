@@ -34,6 +34,21 @@ export const CACHE_TAGS = {
 
   // ── Site & settings (very low-churn) ────────────────────────────────────
   SETTINGS: "settings",
+
+  // ── User directory ───────────────────────────────────────────────────────
+  USERS_LIST: "users:list",
+  USER_DETAIL: (id: string) => `user:${id}`,
+  USER_DROPDOWN: "users:dropdown",
+
+  // ── Transform Studio ─────────────────────────────────────────────────────
+  TRANSFORM_JOBS: "transform:jobs",
+  TRANSFORM_JOB: (id: string) => `transform:job:${id}`,
+  TRANSFORM_PRESETS: "transform:presets",
+  AI_PROVIDERS: "transform:ai-providers",
+  AI_MODELS: "transform:ai-models",
+
+  // ── Geographic map (very low-churn) ──────────────────────────────────────
+  MAP_DATA: "utility:map",
 } as const;
 
 export type CacheTag = typeof CACHE_TAGS[keyof typeof CACHE_TAGS];

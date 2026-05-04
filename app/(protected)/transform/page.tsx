@@ -24,8 +24,16 @@ const STATUS_TABS = [
   { label: 'Approved', value: 'approved' },
 ]
 
-async function TransformContent({ status }: { status: string }) {
-  const result = await getTransformJobs(status === 'all' ? undefined : status)
+async function TransformContent({
+  status,
+  userId,
+  isAdmin,
+}: {
+  status: string
+  userId: string
+  isAdmin: boolean
+}) {
+  const result = await getTransformJobs(status === 'all' ? undefined : status, userId, isAdmin)
   const jobs = result.success ? (result.data ?? []) : []
 
   if (!result.success) {
@@ -70,6 +78,15 @@ export default async function TransformPage({ searchParams }: PageProps) {
   const params = await searchParams
   const status = params.status ?? 'all'
 
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = user
+    ? await supabase.from('users').select('type').eq('id', user.id).single()
+    : { data: null }
+  const userId = user?.id ?? ''
+  const isAdmin = profile?.type === 'Admin'
+
   return (
     <div className="mx-auto py-8 px-4 w-full max-w-7xl">
       {/* ── Header ───────────────────────────────────────────────── */}
@@ -113,7 +130,7 @@ export default async function TransformPage({ searchParams }: PageProps) {
 
       {/* ── Jobs list ─────────────────────────────────────────────── */}
       <Suspense fallback={<TransformListSkeleton />}>
-        <TransformContent status={status} />
+        <TransformContent status={status} userId={userId} isAdmin={isAdmin} />
       </Suspense>
     </div>
   )

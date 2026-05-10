@@ -27,6 +27,21 @@ CREATE TABLE public.chats (
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT chats_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.clients (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  lead_id uuid NOT NULL UNIQUE,
+  name text NOT NULL,
+  primary_phone text,
+  created_from_status_id uuid,
+  owner_id uuid,
+  converted_at timestamp with time zone NOT NULL DEFAULT now(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT clients_pkey PRIMARY KEY (id),
+  CONSTRAINT clients_lead_id_fkey FOREIGN KEY (lead_id) REFERENCES public.leads(id),
+  CONSTRAINT clients_created_from_status_id_fkey FOREIGN KEY (created_from_status_id) REFERENCES public.pipeline_statuses(id),
+  CONSTRAINT clients_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.users(id)
+);
 CREATE TABLE public.departments (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   name text NOT NULL UNIQUE,
@@ -61,6 +76,27 @@ CREATE TABLE public.lead_activity_logs (
   CONSTRAINT lead_activity_logs_pkey PRIMARY KEY (id),
   CONSTRAINT lead_activity_logs_lead_id_fkey FOREIGN KEY (lead_id) REFERENCES public.leads(id),
   CONSTRAINT lead_activity_logs_actor_id_fkey FOREIGN KEY (actor_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.lead_assignments (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  lead_id uuid NOT NULL,
+  stage_id uuid,
+  status_id uuid,
+  department_id uuid,
+  assigned_to uuid,
+  assigned_by uuid,
+  assigned_at timestamp with time zone NOT NULL DEFAULT now(),
+  unassigned_at timestamp with time zone,
+  is_current boolean NOT NULL DEFAULT true,
+  reason text,
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT lead_assignments_pkey PRIMARY KEY (id),
+  CONSTRAINT lead_assignments_lead_id_fkey FOREIGN KEY (lead_id) REFERENCES public.leads(id),
+  CONSTRAINT lead_assignments_stage_id_fkey FOREIGN KEY (stage_id) REFERENCES public.pipeline_stages(id),
+  CONSTRAINT lead_assignments_status_id_fkey FOREIGN KEY (status_id) REFERENCES public.pipeline_statuses(id),
+  CONSTRAINT lead_assignments_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id),
+  CONSTRAINT lead_assignments_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES public.users(id),
+  CONSTRAINT lead_assignments_assigned_by_fkey FOREIGN KEY (assigned_by) REFERENCES public.users(id)
 );
 CREATE TABLE public.lead_call_logs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -136,6 +172,25 @@ CREATE TABLE public.lead_payments (
   CONSTRAINT lead_payments_lead_id_fkey FOREIGN KEY (lead_id) REFERENCES public.leads(id),
   CONSTRAINT lead_payments_recorded_by_fkey FOREIGN KEY (recorded_by) REFERENCES public.users(id)
 );
+CREATE TABLE public.lead_status_history (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  lead_id uuid NOT NULL,
+  from_stage_id uuid,
+  to_stage_id uuid,
+  from_status_id uuid,
+  to_status_id uuid,
+  changed_by uuid,
+  changed_at timestamp with time zone NOT NULL DEFAULT now(),
+  note text,
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT lead_status_history_pkey PRIMARY KEY (id),
+  CONSTRAINT lead_status_history_lead_id_fkey FOREIGN KEY (lead_id) REFERENCES public.leads(id),
+  CONSTRAINT lead_status_history_from_stage_id_fkey FOREIGN KEY (from_stage_id) REFERENCES public.pipeline_stages(id),
+  CONSTRAINT lead_status_history_to_stage_id_fkey FOREIGN KEY (to_stage_id) REFERENCES public.pipeline_stages(id),
+  CONSTRAINT lead_status_history_from_status_id_fkey FOREIGN KEY (from_status_id) REFERENCES public.pipeline_statuses(id),
+  CONSTRAINT lead_status_history_to_status_id_fkey FOREIGN KEY (to_status_id) REFERENCES public.pipeline_statuses(id),
+  CONSTRAINT lead_status_history_changed_by_fkey FOREIGN KEY (changed_by) REFERENCES public.users(id)
+);
 CREATE TABLE public.leads (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   cid text UNIQUE,
@@ -158,9 +213,40 @@ CREATE TABLE public.leads (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   requirements jsonb DEFAULT '[]'::jsonb,
+  current_stage_id uuid,
+  current_status_id uuid,
+  current_owner_id uuid,
+  current_department_id uuid,
+  priority text NOT NULL DEFAULT 'normal'::text CHECK (priority = ANY (ARRAY['low'::text, 'normal'::text, 'high'::text, 'urgent'::text])),
+  lost_reason text,
+  close_reason text,
+  closed_at timestamp with time zone,
+  converted_to_client_at timestamp with time zone,
+  converted_to_project_at timestamp with time zone,
   CONSTRAINT leads_pkey PRIMARY KEY (id),
   CONSTRAINT leads_sales_executive_id_fkey FOREIGN KEY (sales_executive_id) REFERENCES public.users(id),
-  CONSTRAINT leads_cre_id_fkey FOREIGN KEY (cre_id) REFERENCES public.users(id)
+  CONSTRAINT leads_cre_id_fkey FOREIGN KEY (cre_id) REFERENCES public.users(id),
+  CONSTRAINT leads_current_stage_id_fkey FOREIGN KEY (current_stage_id) REFERENCES public.pipeline_stages(id),
+  CONSTRAINT leads_current_status_id_fkey FOREIGN KEY (current_status_id) REFERENCES public.pipeline_statuses(id),
+  CONSTRAINT leads_current_owner_id_fkey FOREIGN KEY (current_owner_id) REFERENCES public.users(id),
+  CONSTRAINT leads_current_department_id_fkey FOREIGN KEY (current_department_id) REFERENCES public.departments(id)
+);
+CREATE TABLE public.measurements (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  lead_id uuid NOT NULL,
+  client_id uuid,
+  scheduled_at timestamp with time zone,
+  measured_at timestamp with time zone,
+  measurement_by uuid,
+  status text NOT NULL DEFAULT 'scheduled'::text CHECK (status = ANY (ARRAY['scheduled'::text, 'rescheduled'::text, 'done'::text, 'cancelled'::text])),
+  notes text,
+  files ARRAY NOT NULL DEFAULT '{}'::text[],
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT measurements_pkey PRIMARY KEY (id),
+  CONSTRAINT measurements_lead_id_fkey FOREIGN KEY (lead_id) REFERENCES public.leads(id),
+  CONSTRAINT measurements_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id),
+  CONSTRAINT measurements_measurement_by_fkey FOREIGN KEY (measurement_by) REFERENCES public.users(id)
 );
 CREATE TABLE public.meeting_slots (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -179,6 +265,71 @@ CREATE TABLE public.messages (
   CONSTRAINT messages_pkey PRIMARY KEY (id),
   CONSTRAINT messages_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.chats(id),
   CONSTRAINT messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.pipeline_stages (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  code text NOT NULL UNIQUE,
+  name text NOT NULL UNIQUE,
+  description text,
+  sort_order integer NOT NULL,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT pipeline_stages_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.pipeline_statuses (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  stage_id uuid NOT NULL,
+  code text NOT NULL,
+  name text NOT NULL,
+  description text,
+  sort_order integer NOT NULL,
+  default_department_id uuid,
+  is_terminal boolean NOT NULL DEFAULT false,
+  is_conversion_point boolean NOT NULL DEFAULT false,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT pipeline_statuses_pkey PRIMARY KEY (id),
+  CONSTRAINT pipeline_statuses_stage_id_fkey FOREIGN KEY (stage_id) REFERENCES public.pipeline_stages(id),
+  CONSTRAINT pipeline_statuses_default_department_id_fkey FOREIGN KEY (default_department_id) REFERENCES public.departments(id)
+);
+CREATE TABLE public.projects (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  lead_id uuid NOT NULL UNIQUE,
+  client_id uuid,
+  project_no text UNIQUE,
+  current_status_id uuid,
+  current_department_id uuid,
+  project_manager_id uuid,
+  start_date date,
+  expected_handover_date date,
+  actual_handover_date date,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT projects_pkey PRIMARY KEY (id),
+  CONSTRAINT projects_lead_id_fkey FOREIGN KEY (lead_id) REFERENCES public.leads(id),
+  CONSTRAINT projects_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id),
+  CONSTRAINT projects_current_status_id_fkey FOREIGN KEY (current_status_id) REFERENCES public.pipeline_statuses(id),
+  CONSTRAINT projects_current_department_id_fkey FOREIGN KEY (current_department_id) REFERENCES public.departments(id),
+  CONSTRAINT projects_project_manager_id_fkey FOREIGN KEY (project_manager_id) REFERENCES public.users(id)
+);
+CREATE TABLE public.quotations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  lead_id uuid NOT NULL,
+  client_id uuid,
+  quotation_no text UNIQUE,
+  amount numeric,
+  status text NOT NULL DEFAULT 'draft'::text CHECK (status = ANY (ARRAY['draft'::text, 'sent'::text, 'revised'::text, 'approved'::text, 'rejected'::text, 'expired'::text])),
+  sent_at timestamp with time zone,
+  approved_at timestamp with time zone,
+  created_by uuid,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT quotations_pkey PRIMARY KEY (id),
+  CONSTRAINT quotations_lead_id_fkey FOREIGN KEY (lead_id) REFERENCES public.leads(id),
+  CONSTRAINT quotations_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(id),
+  CONSTRAINT quotations_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
 );
 CREATE TABLE public.roles (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -201,6 +352,42 @@ CREATE TABLE public.site_settings (
   updated_by uuid,
   CONSTRAINT site_settings_pkey PRIMARY KEY (id),
   CONSTRAINT site_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id)
+);
+CREATE TABLE public.status_transitions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  from_status_id uuid,
+  to_status_id uuid NOT NULL,
+  allowed_department_id uuid,
+  allowed_role_id uuid,
+  requires_note boolean NOT NULL DEFAULT false,
+  requires_assignment boolean NOT NULL DEFAULT false,
+  requires_follow_up boolean NOT NULL DEFAULT false,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT status_transitions_pkey PRIMARY KEY (id),
+  CONSTRAINT status_transitions_from_status_id_fkey FOREIGN KEY (from_status_id) REFERENCES public.pipeline_statuses(id),
+  CONSTRAINT status_transitions_to_status_id_fkey FOREIGN KEY (to_status_id) REFERENCES public.pipeline_statuses(id),
+  CONSTRAINT status_transitions_allowed_department_id_fkey FOREIGN KEY (allowed_department_id) REFERENCES public.departments(id),
+  CONSTRAINT status_transitions_allowed_role_id_fkey FOREIGN KEY (allowed_role_id) REFERENCES public.roles(id)
+);
+CREATE TABLE public.support_requests (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  lead_id uuid NOT NULL,
+  requested_by uuid,
+  assigned_to uuid,
+  department_id uuid,
+  priority text NOT NULL DEFAULT 'normal'::text CHECK (priority = ANY (ARRAY['low'::text, 'normal'::text, 'high'::text, 'urgent'::text])),
+  subject text NOT NULL,
+  description text,
+  status text NOT NULL DEFAULT 'open'::text CHECK (status = ANY (ARRAY['open'::text, 'in_progress'::text, 'resolved'::text, 'cancelled'::text])),
+  resolved_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT support_requests_pkey PRIMARY KEY (id),
+  CONSTRAINT support_requests_lead_id_fkey FOREIGN KEY (lead_id) REFERENCES public.leads(id),
+  CONSTRAINT support_requests_requested_by_fkey FOREIGN KEY (requested_by) REFERENCES public.users(id),
+  CONSTRAINT support_requests_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES public.users(id),
+  CONSTRAINT support_requests_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id)
 );
 CREATE TABLE public.transform_ai_models (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

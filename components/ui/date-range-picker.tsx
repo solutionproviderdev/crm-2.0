@@ -40,7 +40,11 @@ export function DateRangePicker({
     { label: "All Time", getValue: () => ({ from: undefined, to: undefined }) },
   ];
 
-  const handleSelect = (range: any) => {
+  const handleSelect = (range: Date | DateRange) => {
+    if (range instanceof Date) {
+      onChange({ from: range, to: undefined });
+      return;
+    }
     onChange(range);
     if (range?.from && range?.to) {
       // Don't close immediately if range is being selected, but we could if we want
@@ -67,19 +71,19 @@ export function DateRangePicker({
             id="date"
             variant={"outline"}
             className={cn(
-              "h-10 px-4 justify-start text-left font-bold rounded-xl border-gray-200 hover:border-[var(--brand-primary)]/30 hover:bg-white transition-all shadow-sm group",
-              !value && "text-gray-500"
+              "h-10 px-4 justify-start text-left font-bold rounded-xl hover:border-[var(--brand-primary)]/30 transition-all shadow-sm group",
+              !value?.from && "text-muted-foreground"
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4 text-gray-400 group-hover:text-[var(--brand-primary)] transition-colors" />
+            <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground group-hover:text-[var(--brand-primary)] transition-colors" />
             <span className="text-xs truncate">{displayText}</span>
-            <ChevronDown className="ml-auto h-4 w-4 text-gray-400 opacity-50" />
+            <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground opacity-60" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0 rounded-2xl shadow-2xl border-gray-100 bg-white/95 backdrop-blur-md flex overflow-hidden lg:flex-row flex-col" align="start">
+        <PopoverContent className="w-auto p-0 rounded-2xl shadow-2xl bg-popover/95 backdrop-blur-md flex overflow-hidden lg:flex-row flex-col" align="start">
           {/* Presets Sidebar */}
-          <div className="w-full lg:w-44 border-b lg:border-b-0 lg:border-r border-gray-100 p-2 bg-gray-50/50">
-             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 py-2">Quick Select</p>
+          <div className="w-full lg:w-44 border-b lg:border-b-0 lg:border-r border-border p-2 bg-muted/50">
+             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-3 py-2">Quick Select</p>
              <div className="space-y-1">
                {presets.map((preset) => (
                  <button
@@ -88,7 +92,7 @@ export function DateRangePicker({
                      onChange(preset.getValue());
                      setIsOpen(false);
                    }}
-                   className="w-full text-left px-3 py-2 text-xs font-bold text-gray-600 hover:bg-[var(--brand-primary)]/5 hover:text-[var(--brand-primary)] rounded-xl transition-all flex items-center justify-between group"
+                   className="w-full text-left px-3 py-2 text-xs font-bold text-muted-foreground hover:bg-[var(--brand-primary)]/10 hover:text-[var(--brand-primary)] rounded-xl transition-all flex items-center justify-between group"
                  >
                    {preset.label}
                    <Check className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -100,14 +104,14 @@ export function DateRangePicker({
           <div className="p-1">
             <Calendar
               mode="range"
-              selected={value as any}
+              selected={value}
               onSelect={handleSelect}
             />
-            <div className="p-3 border-t border-gray-100 flex justify-end gap-2 bg-white">
+            <div className="p-3 border-t border-border flex justify-end gap-2 bg-card">
                <Button 
                 variant="ghost" 
                 size="sm" 
-                className="text-xs font-bold rounded-lg text-gray-500"
+                className="text-xs font-bold rounded-lg text-muted-foreground"
                 onClick={() => {
                   onChange({ from: undefined, to: undefined });
                   setIsOpen(false);

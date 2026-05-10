@@ -112,14 +112,6 @@ async function getActorClient() {
   return createClient(cookieStore);
 }
 
-async function getActorId() {
-  const client = await getActorClient();
-  const {
-    data: { user },
-  } = await client.auth.getUser();
-  return user?.id ?? null;
-}
-
 export async function getLifecycleStatusGroups(): Promise<
   ActionResult<LifecycleStatusGroup[]>
 > {

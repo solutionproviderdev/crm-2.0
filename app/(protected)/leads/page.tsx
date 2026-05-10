@@ -7,6 +7,8 @@ import {
   getLeadFilterOptions,
   getLeadStatusCounts,
   getAllActiveUsers,
+  getLifecycleStatusGroups,
+  getLifecycleTransitionRules,
 } from '@/app/actions/leads';
 import { getCurrentUser } from '@/app/actions/auth';
 
@@ -67,12 +69,21 @@ async function LeadsContent({
     isAdmin,
   };
 
-  const [leadsResult, filterOptionsResult, statusCountsResult, usersResult] =
+  const [
+    leadsResult,
+    filterOptionsResult,
+    statusCountsResult,
+    usersResult,
+    lifecycleResult,
+    lifecycleTransitionsResult,
+  ] =
     await Promise.all([
       getFilteredLeads(filterParams),
       getLeadFilterOptions(),
       getLeadStatusCounts({ userId, isAdmin }),
       getAllActiveUsers(),
+      getLifecycleStatusGroups(),
+      getLifecycleTransitionRules(),
     ]);
 
   if (!leadsResult.success) {
@@ -96,6 +107,12 @@ async function LeadsContent({
           : { statuses: [], sources: [] },
         statusCounts: statusCountsResult.success
           ? statusCountsResult.data
+          : [],
+        lifecycleStatusGroups: lifecycleResult.success
+          ? lifecycleResult.data
+          : [],
+        lifecycleTransitionRules: lifecycleTransitionsResult.success
+          ? lifecycleTransitionsResult.data
           : [],
       }}
       users={allUsers}

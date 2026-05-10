@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { SALES_STAGES } from "@/lib/pipeline-stages";
-import { getPipelineLeads, getAllActiveUsers } from "@/app/actions/leads";
+import { getPipelineLeads, getAllActiveUsers, getLifecycleStatusGroups, getLifecycleTransitionRules } from "@/app/actions/leads";
 import { ClientPipelineContent } from "@/components/leads/pipeline/ClientPipelineContent";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -31,13 +31,23 @@ async function ClientPipelinePageContent() {
   const isAdmin = userProfile?.type === "Admin";
   const userId = session.user.id;
 
-  const [pipelineResult, usersResult] = await Promise.all([
+  const lifecycleResult = await getLifecycleStatusGroups();
+  const lifecycleStatusGroups = lifecycleResult.success ? lifecycleResult.data : [];
+  const clientStages = lifecycleResult.success
+    ? lifecycleResult.data
+        .find((group) => group.code === "client")
+        ?.statuses.map((status) => status.name) ?? [...SALES_STAGES]
+    : [...SALES_STAGES];
+
+  const [pipelineResult, usersResult, transitionResult] = await Promise.all([
     getPipelineLeads({
-      stages: SALES_STAGES,
+      stages: clientStages,
+      stageCode: "client",
       userId,
       isAdmin,
     }),
     getAllActiveUsers(),
+    getLifecycleTransitionRules(),
   ]);
 
   if (!pipelineResult.success) {
@@ -49,13 +59,17 @@ async function ClientPipelinePageContent() {
   }
 
   const users = usersResult.success ? usersResult.data : [];
+  const lifecycleTransitionRules = transitionResult.success ? transitionResult.data : [];
 
   return (
     <ClientPipelineContent
       initialData={pipelineResult.data}
+      stages={clientStages}
       users={users}
       userId={userId}
       isAdmin={isAdmin}
+      lifecycleStatusGroups={lifecycleStatusGroups}
+      lifecycleTransitionRules={lifecycleTransitionRules}
     />
   );
 }

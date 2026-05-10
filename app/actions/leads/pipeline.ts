@@ -3,7 +3,8 @@
 import { cacheLife, cacheTag } from "next/cache";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { CACHE_TAGS } from "@/lib/cache-tags";
-import type { ActionResult, Lead } from "@/lib/types";
+import { getLifecycleStatusGroups } from "./lifecycle";
+import type { ActionResult, Lead, LifecycleStageCode } from "@/lib/types";
 
 /**
  * getPipelineLeads
@@ -28,6 +29,7 @@ import type { ActionResult, Lead } from "@/lib/types";
  */
 export async function getPipelineLeads(params: {
   stages: readonly string[];
+  stageCode?: LifecycleStageCode;
   status?: string;
   creId?: string;
   salesExecutiveId?: string;
@@ -42,6 +44,7 @@ export async function getPipelineLeads(params: {
 
   const {
     stages,
+    stageCode,
     status,
     creId,
     salesExecutiveId,
@@ -52,6 +55,20 @@ export async function getPipelineLeads(params: {
   } = params;
 
   const supabase = createAdminClient();
+  const lifecycleResult = stageCode
+    ? await getLifecycleStatusGroups()
+    : undefined;
+  const lifecycleStage = lifecycleResult?.success
+    ? lifecycleResult.data.find((group) => group.code === stageCode)
+    : undefined;
+  const lifecycleStatuses = lifecycleStage?.statuses ?? [];
+  const lifecycleStatusNames = lifecycleStatuses.map((item) => item.name);
+  const statusIdByName = new Map(
+    lifecycleStatuses.map((item) => [item.name, item.id])
+  );
+  const boardStages = lifecycleStatusNames.length
+    ? lifecycleStatusNames
+    : [...stages];
 
   let query = supabase
     .from("leads")
@@ -63,9 +80,18 @@ export async function getPipelineLeads(params: {
       meetings:lead_meetings(id, date, slot, status),
       payments:lead_payments(id, amount, payment_date, payment_status)
     `
-    )
-    // Always restrict to the pipeline's stage set
-    .in("status", stages as string[]);
+    );
+
+  // Prefer normalized lifecycle filtering. Fall back to legacy status strings if
+  // lifecycle data is unavailable so older environments still render.
+  if (lifecycleStatuses.length) {
+    query = query.in(
+      "current_status_id",
+      lifecycleStatuses.map((item) => item.id)
+    );
+  } else {
+    query = query.in("status", stages as string[]);
+  }
 
   // ── Non-admin data scoping ────────────────────────────────────────────────
   // Operators can only see leads where they are the CRE or Sales Executive.
@@ -77,7 +103,10 @@ export async function getPipelineLeads(params: {
   // ── Optional filters ──────────────────────────────────────────────────────
   // Single status filter (narrows within the stage set)
   if (status && status !== "all") {
-    query = query.eq("status", status);
+    const statusId = statusIdByName.get(status);
+    query = statusId
+      ? query.eq("current_status_id", statusId)
+      : query.eq("status", status);
   }
 
   if (creId && creId !== "all") {
@@ -106,13 +135,17 @@ export async function getPipelineLeads(params: {
   // ── Group leads by stage ──────────────────────────────────────────────────
   // Initialize all stage buckets to ensure empty stages still appear.
   const grouped: Record<string, Lead[]> = {};
-  for (const stage of stages) {
+  for (const stage of boardStages) {
     grouped[stage] = [];
   }
 
   for (const lead of data as Lead[]) {
-    if (lead.status in grouped) {
-      grouped[lead.status].push(lead);
+    const lifecycleStatus = lifecycleStatuses.find(
+      (item) => item.id === lead.current_status_id
+    );
+    const groupKey = lifecycleStatus?.name ?? lead.status;
+    if (groupKey in grouped) {
+      grouped[groupKey].push(lead);
     }
   }
 

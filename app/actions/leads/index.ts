@@ -13,6 +13,23 @@ export {
 } from "./queries";
 
 export {
+  getLifecycleStatusGroups,
+  getLifecycleStatusNames,
+  getLifecycleTransitionRules,
+  getLeadLifecycleTimeline,
+  getDepartments,
+  getAssignmentOperations,
+  reassignLeadOwner,
+  createSupportRequest,
+  updateSupportRequest,
+  getSupportOperations,
+  getCalendarOperations,
+  getLifecycleReports,
+  updatePipelineStatus,
+  updateStatusTransition,
+} from "./lifecycle";
+
+export {
   createLead,
   updateLead,
   addLeadComment,

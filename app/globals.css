@@ -31,6 +31,10 @@
   
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   
   --color-border: var(--border);
   --color-input: var(--input);
@@ -54,6 +58,12 @@
   
   --primary: #006080; /* Brand */
   --primary-foreground: #ffffff;
+
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
   
   --muted: #f1f5f9; /* slate-100 */
   --muted-foreground: #64748b; /* slate-500 */
@@ -91,6 +101,12 @@
   
   --primary: #006080;
   --primary-foreground: #ffffff;
+
+  --secondary: #1e293b;
+  --secondary-foreground: #f8fafc;
+
+  --destructive: #f87171;
+  --destructive-foreground: #020617;
   
   --muted: #1e293b; /* slate-800 */
   --muted-foreground: #94a3b8; /* slate-400 */
@@ -117,5 +133,66 @@ body {
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  /*
+    Theme compatibility layer for custom screens that still use fixed
+    Tailwind palette utilities. Shared primitives use semantic tokens, but
+    feature components in this codebase contain many direct gray/white classes.
+  */
+  .dark :where(.bg-white, .bg-white\/95, .bg-white\/90, .bg-white\/80) {
+    background-color: color-mix(in srgb, var(--card) 94%, transparent);
+  }
+
+  .dark :where(.bg-gray-50, .bg-gray-50\/50, .bg-slate-50) {
+    background-color: color-mix(in srgb, var(--muted) 70%, transparent);
+  }
+
+  .dark :where(.bg-\[\#f8fafc\], .bg-\[\#f0f4f8\]) {
+    background-color: var(--background);
+  }
+
+  .dark :where(.bg-gray-100, .bg-slate-100) {
+    background-color: var(--muted);
+  }
+
+  .dark :where(.bg-gray-200, .bg-slate-200) {
+    background-color: color-mix(in srgb, var(--muted-foreground) 22%, var(--muted));
+  }
+
+  .dark :where(.text-black, .text-gray-950, .text-gray-900, .text-gray-800, .text-slate-950, .text-slate-900, .text-slate-800) {
+    color: var(--foreground);
+  }
+
+  .dark :where(.text-gray-700, .text-gray-600, .text-slate-700, .text-slate-600) {
+    color: color-mix(in srgb, var(--foreground) 82%, var(--muted-foreground));
+  }
+
+  .dark :where(.text-gray-500, .text-gray-400, .text-slate-500, .text-slate-400) {
+    color: var(--muted-foreground);
+  }
+
+  .dark :where(.text-gray-300, .text-slate-300) {
+    color: color-mix(in srgb, var(--muted-foreground) 65%, var(--background));
+  }
+
+  .dark :where(.border-gray-50, .border-gray-100, .border-gray-200, .border-slate-100, .border-slate-200) {
+    border-color: var(--border);
+  }
+
+  .dark :where(.ring-black\/5, .ring-gray-100, .ring-slate-100) {
+    --tw-ring-color: color-mix(in srgb, var(--border) 80%, transparent);
+  }
+
+  .dark :where(.shadow-gray-100\/50, .shadow-gray-200, .shadow-black\/5, .shadow-black\/\[0\.04\]) {
+    --tw-shadow-color: rgb(0 0 0 / 0.35);
+  }
+
+  .dark :where(.hover\:bg-white:hover) {
+    background-color: color-mix(in srgb, var(--card) 86%, var(--foreground) 8%);
+  }
+
+  .dark :where(.hover\:bg-gray-50:hover, .hover\:bg-gray-100:hover, .hover\:bg-slate-100:hover) {
+    background-color: color-mix(in srgb, var(--muted) 86%, var(--foreground) 8%);
   }
 }

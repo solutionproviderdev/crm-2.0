@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
   User, 
-  MapPin, 
   Globe, 
   FileText, 
   Calendar,
@@ -17,14 +16,25 @@ import { LeadStatusControl } from "./LeadStatusControl";
 import { LeadPhoneNumbers } from "./LeadPhoneNumbers";
 import { LeadAddressEditor } from "./LeadAddressEditor";
 import { LeadRequirements } from "./LeadRequirements";
-import { User as UserType } from "@/lib/types";
+import {
+  User as UserType,
+  type LifecycleStatusGroup,
+  type LifecycleTransitionRule,
+} from "@/lib/types";
 
 interface GeneralInfoProps {
   lead: Lead;
   allUsers: UserType[];
+  lifecycleStatusGroups?: LifecycleStatusGroup[];
+  lifecycleTransitionRules?: LifecycleTransitionRule[];
 }
 
-export function GeneralInfo({ lead, allUsers }: GeneralInfoProps) {
+export function GeneralInfo({
+  lead,
+  allUsers,
+  lifecycleStatusGroups,
+  lifecycleTransitionRules,
+}: GeneralInfoProps) {
   return (
     <div className="space-y-6">
       <Card className="border-none shadow-sm overflow-hidden">
@@ -39,7 +49,13 @@ export function GeneralInfo({ lead, allUsers }: GeneralInfoProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <LeadStatusControl lead={lead} />
+            <LeadStatusControl
+              lead={lead}
+              lifecycleStatusGroups={lifecycleStatusGroups}
+              lifecycleTransitionRules={lifecycleTransitionRules}
+              users={allUsers}
+              variant="compact"
+            />
             <Button className="bg-[var(--brand-primary)] hover:bg-[var(--brand-secondary)] text-xs h-9 gap-2">
               <Plus className="w-4 h-4" />
               Create Quotation

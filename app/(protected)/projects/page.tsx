@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { IMPLEMENTATION_STAGES } from "@/lib/pipeline-stages";
-import { getPipelineLeads, getAllActiveUsers } from "@/app/actions/leads";
+import { getPipelineLeads, getAllActiveUsers, getLifecycleStatusGroups, getLifecycleTransitionRules } from "@/app/actions/leads";
 import { ProjectPipelineContent } from "@/components/leads/pipeline/ProjectPipelineContent";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -31,13 +31,23 @@ async function ProjectPipelinePageContent() {
   const isAdmin = userProfile?.type === "Admin";
   const userId = session.user.id;
 
-  const [pipelineResult, usersResult] = await Promise.all([
+  const lifecycleResult = await getLifecycleStatusGroups();
+  const lifecycleStatusGroups = lifecycleResult.success ? lifecycleResult.data : [];
+  const projectStages = lifecycleResult.success
+    ? lifecycleResult.data
+        .find((group) => group.code === "project")
+        ?.statuses.map((status) => status.name) ?? [...IMPLEMENTATION_STAGES]
+    : [...IMPLEMENTATION_STAGES];
+
+  const [pipelineResult, usersResult, transitionResult] = await Promise.all([
     getPipelineLeads({
-      stages: IMPLEMENTATION_STAGES,
+      stages: projectStages,
+      stageCode: "project",
       userId,
       isAdmin,
     }),
     getAllActiveUsers(),
+    getLifecycleTransitionRules(),
   ]);
 
   if (!pipelineResult.success) {
@@ -49,13 +59,17 @@ async function ProjectPipelinePageContent() {
   }
 
   const users = usersResult.success ? usersResult.data : [];
+  const lifecycleTransitionRules = transitionResult.success ? transitionResult.data : [];
 
   return (
     <ProjectPipelineContent
       initialData={pipelineResult.data}
+      stages={projectStages}
       users={users}
       userId={userId}
       isAdmin={isAdmin}
+      lifecycleStatusGroups={lifecycleStatusGroups}
+      lifecycleTransitionRules={lifecycleTransitionRules}
     />
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Lead, User } from "@/lib/types";
+import { Lead, User, type LifecycleStatusGroup, type LifecycleTransitionRule } from "@/lib/types";
 import { LeadCard } from "./LeadCard";
 import { LeadTable } from "./LeadTable";
 import { LeadFilters } from "./LeadFilters";
@@ -41,6 +41,8 @@ interface LeadsPageContentProps {
     };
     /** True global counts per status — from getLeadStatusCounts(), not page-scoped */
     statusCounts: { status: string; count: number }[];
+    lifecycleStatusGroups: LifecycleStatusGroup[];
+    lifecycleTransitionRules: LifecycleTransitionRule[];
   };
   /** All active users, used for both CRE and Sales assignment dropdowns */
   users: User[];
@@ -205,6 +207,8 @@ export function LeadsPageContent({ initialData, users }: LeadsPageContentProps) 
         isOpen={!!selectedLead}
         onClose={() => setSelectedLead(null)}
         allUsers={users}
+        lifecycleStatusGroups={initialData.lifecycleStatusGroups}
+        lifecycleTransitionRules={initialData.lifecycleTransitionRules}
       />
     </div>
   );

@@ -21,8 +21,8 @@ import { Button } from "@/components/ui/button";
 
 export interface CalendarProps {
   mode?: "single" | "range";
-  selected?: Date | { from: Date; to?: Date | undefined } | undefined;
-  onSelect?: (date: any) => void;
+  selected?: Date | { from: Date | undefined; to?: Date | undefined } | undefined;
+  onSelect?: (date: Date | { from: Date | undefined; to?: Date | undefined }) => void;
   className?: string;
 }
 
@@ -42,7 +42,7 @@ export function Calendar({ mode = "single", selected, onSelect, className }: Cal
     if (mode === "single") {
       onSelect?.(day);
     } else if (mode === "range") {
-      const range = selected as { from: Date; to?: Date } || { from: undefined, to: undefined };
+      const range = selected as { from: Date | undefined; to?: Date } || { from: undefined, to: undefined };
       if (!range.from || (range.from && range.to)) {
         onSelect?.({ from: day, to: undefined });
       } else {
@@ -57,7 +57,7 @@ export function Calendar({ mode = "single", selected, onSelect, className }: Cal
 
   const isInRange = (day: Date) => {
     if (mode !== "range" || !selected) return false;
-    const { from, to } = selected as { from: Date; to?: Date };
+    const { from, to } = selected as { from: Date | undefined; to?: Date };
     if (from && to) {
       return isWithinInterval(day, { start: from, end: to });
     }
@@ -66,27 +66,27 @@ export function Calendar({ mode = "single", selected, onSelect, className }: Cal
 
   const isRangeStart = (day: Date) => {
     if (mode !== "range" || !selected) return false;
-    const { from } = selected as { from: Date; to?: Date };
-    return from && isSameDay(day, from);
+    const { from } = selected as { from: Date | undefined; to?: Date };
+    return Boolean(from && isSameDay(day, from));
   };
 
   const isRangeEnd = (day: Date) => {
     if (mode !== "range" || !selected) return false;
-    const { to } = selected as { from: Date; to?: Date };
-    return to && isSameDay(day, to);
+    const { to } = selected as { from: Date | undefined; to?: Date };
+    return Boolean(to && isSameDay(day, to));
   };
 
   return (
-    <div className={cn("p-4 bg-white select-none", className)}>
+    <div className={cn("p-4 bg-card text-card-foreground select-none", className)}>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-bold text-gray-900 tracking-tight">
+        <h2 className="text-sm font-bold text-foreground tracking-tight">
           {format(currentMonth, "MMMM yyyy")}
         </h2>
         <div className="flex gap-1">
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 rounded-lg hover:bg-gray-100"
+            className="h-7 w-7 rounded-lg hover:bg-accent"
             onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -94,7 +94,7 @@ export function Calendar({ mode = "single", selected, onSelect, className }: Cal
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 rounded-lg hover:bg-gray-100"
+            className="h-7 w-7 rounded-lg hover:bg-accent"
             onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
           >
             <ChevronRight className="h-4 w-4" />
@@ -104,7 +104,7 @@ export function Calendar({ mode = "single", selected, onSelect, className }: Cal
 
       <div className="grid grid-cols-7 gap-y-1 text-center items-center">
         {daysOfWeek.map((day) => (
-          <div key={day} className="text-[10px] font-bold text-gray-400 uppercase tracking-widest py-2">
+          <div key={day} className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest py-2">
             {day}
           </div>
         ))}
@@ -121,8 +121,8 @@ export function Calendar({ mode = "single", selected, onSelect, className }: Cal
                 onClick={() => handleDateClick(day)}
                 className={cn(
                   "h-8 w-8 text-xs font-semibold rounded-lg transition-all relative z-10",
-                  !isCurrentMonth && "text-gray-300",
-                  isCurrentMonth && "text-gray-700 hover:bg-gray-100",
+                  !isCurrentMonth && "text-muted-foreground/45",
+                  isCurrentMonth && "text-foreground hover:bg-accent",
                   isToday(day) && !isSelected && "text-[var(--brand-primary)] bg-[var(--brand-primary)]/5",
                   isSelected && "bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary)] shadow-lg shadow-[var(--brand-primary)]/20",
                   inRange && !isSelected && "bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] rounded-none first:rounded-l-lg last:rounded-r-lg"

@@ -10,11 +10,12 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Lead } from "@/lib/types";
+import type { Lead, LifecycleTransitionRule, UpdateLeadInput, User } from "@/lib/types";
 import { 
   addLeadComment, 
   addLeadPhone, 
   completeMeeting, 
+  createSupportRequest,
   markAsSold, 
   updateLead,
   updateLeadProjectStatus
@@ -31,19 +32,30 @@ import {
 } from "./StatusFormSections";
 import { format } from "date-fns";
 import { MeetingFixedWizard } from "./MeetingFixedWizard";
+import { UserSelect } from "../UserSelect";
 
 interface StatusActionDialogProps {
   isOpen: boolean;
   onClose: () => void;
   lead: Lead;
   targetStatus: string;
+  targetStatusId?: string;
+  targetStageId?: string;
+  targetTransition?: LifecycleTransitionRule;
+  users?: User[];
+  onUpdated?: () => void;
 }
 
 export function StatusActionDialog({ 
   isOpen, 
   onClose, 
   lead, 
-  targetStatus 
+  targetStatus,
+  targetStatusId,
+  targetStageId,
+  targetTransition,
+  users = [],
+  onUpdated
 }: StatusActionDialogProps) {
   const [loading, setLoading] = useState(false);
   
@@ -51,6 +63,7 @@ export function StatusActionDialog({
   const [comment, setComment] = useState("");
   const [phone, setPhone] = useState("");
   const [followUpTime, setFollowUpTime] = useState(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
+  const [assignedTo, setAssignedTo] = useState(lead.current_owner_id || lead.sales_executive_id || lead.cre_id || "");
   const [projectValue, setProjectValue] = useState(lead.finance?.projectValue?.toString() || "0");
   const [clientsBudget, setClientsBudget] = useState(lead.finance?.clientsBudget?.toString() || "0");
   const [projectStatus, setProjectStatus] = useState({
@@ -67,12 +80,14 @@ export function StatusActionDialog({
     paymentNote: ""
   });
 
-  // Reset form when targetStatus or lead changes
+  // Reset form when the same mounted dialog opens for another lead/status.
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setComment("");
       setPhone("");
       setFollowUpTime(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
+      setAssignedTo(lead.current_owner_id || lead.sales_executive_id || lead.cre_id || "");
       setProjectValue(lead.finance?.projectValue?.toString() || "0");
       setClientsBudget(lead.finance?.clientsBudget?.toString() || "0");
       setProjectStatus({
@@ -82,7 +97,40 @@ export function StatusActionDialog({
     }
   }, [isOpen, targetStatus, lead]);
 
+  const buildStatusUpdate = (extra: UpdateLeadInput = {}): UpdateLeadInput => {
+    const update: UpdateLeadInput = {
+      ...extra,
+      status: targetStatus,
+    };
+
+    if (targetStatusId) update.current_status_id = targetStatusId;
+    if (targetStageId) update.current_stage_id = targetStageId;
+    if (targetTransition?.requires_assignment && assignedTo) {
+      update.current_owner_id = assignedTo;
+    }
+
+    return update;
+  };
+
+  const validateTransitionRequirements = () => {
+    if (targetStatus === "Meeting Fixed") return true;
+
+    if (targetTransition?.requires_note && !comment.trim()) {
+      toast.error("A note is required for this transition");
+      return false;
+    }
+
+    if (targetTransition?.requires_assignment && !assignedTo) {
+      toast.error("Assignment is required for this transition");
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async () => {
+    if (!validateTransitionRequirements()) return;
+
     setLoading(true);
     try {
       let result;
@@ -92,11 +140,12 @@ export function StatusActionDialog({
           result = await addLeadPhone(lead.id, phone);
           if (result.success) {
             await addLeadComment(lead.id, comment || `Status changed to ${targetStatus}`);
-            await updateLead(lead.id, { status: targetStatus });
+            await updateLead(lead.id, buildStatusUpdate());
           }
           break;
 
         case "Call Reschedule":
+        case "Call Rescheduled":
         case "Message Rescheduled":
           result = await addLeadFollowUp({ 
             leadId: lead.id, 
@@ -104,7 +153,7 @@ export function StatusActionDialog({
             comment: comment 
           });
           if (result.success) {
-            await updateLead(lead.id, { status: targetStatus });
+            await updateLead(lead.id, buildStatusUpdate());
           }
           break;
 
@@ -115,6 +164,9 @@ export function StatusActionDialog({
             projectStatus.subStatus, 
             comment
           );
+          if (result.success && (targetStatusId || targetStageId)) {
+            await updateLead(lead.id, buildStatusUpdate());
+          }
           break;
 
         case "Meeting Complete":
@@ -132,6 +184,9 @@ export function StatusActionDialog({
             followUpTime,
             comment
           });
+          if (result.success && (targetStatusId || targetStageId)) {
+            await updateLead(lead.id, buildStatusUpdate());
+          }
           break;
 
         case "Sold":
@@ -154,34 +209,59 @@ export function StatusActionDialog({
             nextFollowUpTime: followUpTime,
             comment
           });
+          if (
+            result.success &&
+            (targetTransition?.requires_assignment || targetStatusId || targetStageId)
+          ) {
+            await updateLead(lead.id, buildStatusUpdate());
+          }
           break;
 
         case "Prospect":
-          result = await updateLead(lead.id, { 
-            status: targetStatus,
+          result = await updateLead(lead.id, buildStatusUpdate({
             finance: {
               ...(lead.finance || {}),
               projectValue: Number(projectValue),
               clientsBudget: Number(clientsBudget)
             }
-          });
+          }));
           if (result.success) {
             await addLeadComment(lead.id, comment);
             await addLeadFollowUp({ leadId: lead.id, time: followUpTime });
           }
           break;
 
+        case "Need Support":
+          result = await updateLead(lead.id, buildStatusUpdate());
+          if (result.success) {
+            await addLeadComment(lead.id, comment || "Support requested");
+            await createSupportRequest({
+              leadId: lead.id,
+              subject: `Support needed: ${lead.name}`,
+              description: comment || "Support requested from lifecycle transition.",
+              priority:
+                lead.priority === "urgent" || lead.priority === "high"
+                  ? lead.priority
+                  : "normal",
+              assignedTo: assignedTo || undefined,
+            });
+          }
+          break;
+
         default:
-          // Simple status change with comment
-          result = await updateLead(lead.id, { status: targetStatus });
+          result = await updateLead(lead.id, buildStatusUpdate());
           if (result.success) {
             await addLeadComment(lead.id, comment || `Status changed to ${targetStatus}`);
+            if (targetTransition?.requires_follow_up) {
+              await addLeadFollowUp({ leadId: lead.id, time: followUpTime, comment });
+            }
           }
           break;
       }
 
       if (result?.success) {
         toast.success(`Lead status updated to ${targetStatus}`);
+        onUpdated?.();
         onClose();
       } else {
         toast.error(result?.error || "Failed to update status");
@@ -195,10 +275,23 @@ export function StatusActionDialog({
   };
 
   const renderFormFields = () => {
+    const transitionFields = (
+      <TransitionRequirementFields
+        targetTransition={targetTransition}
+        users={users}
+        assignedTo={assignedTo}
+        onAssignedToChange={setAssignedTo}
+        followUpTime={followUpTime}
+        onFollowUpTimeChange={setFollowUpTime}
+        showFollowUp={targetTransition?.requires_follow_up && !["Call Reschedule", "Call Rescheduled", "Message Rescheduled", "Meeting Complete", "Prospect", "Sold"].includes(targetStatus)}
+      />
+    );
+
     switch (targetStatus) {
       case "Number Collected":
         return (
           <div className="space-y-4">
+            {transitionFields}
             <div className="space-y-2">
               <label className="text-sm font-medium">New Phone Number*</label>
               <input 
@@ -215,9 +308,11 @@ export function StatusActionDialog({
         );
 
       case "Call Reschedule":
+      case "Call Rescheduled":
       case "Message Rescheduled":
         return (
           <div className="space-y-4">
+            {transitionFields}
             <FollowUpSection value={followUpTime} onChange={setFollowUpTime} required />
             <CommentSection value={comment} onChange={setComment} />
           </div>
@@ -226,6 +321,7 @@ export function StatusActionDialog({
       case "Ongoing":
         return (
           <div className="space-y-4">
+            {transitionFields}
             <ProjectStatusSection 
               status={projectStatus.status}
               subStatus={projectStatus.subStatus}
@@ -240,6 +336,7 @@ export function StatusActionDialog({
       case "Prospect":
         return (
           <div className="space-y-4">
+            {transitionFields}
             <ProjectFinancialsSection 
               projectValue={projectValue}
               clientsBudget={clientsBudget}
@@ -255,6 +352,7 @@ export function StatusActionDialog({
       case "Sold":
         return (
           <div className="space-y-4">
+            {transitionFields}
             <ProjectFinancialsSection 
               projectValue={projectValue}
               clientsBudget={clientsBudget}
@@ -272,7 +370,12 @@ export function StatusActionDialog({
         );
 
       default:
-        return <CommentSection value={comment} onChange={setComment} />;
+        return (
+          <div className="space-y-4">
+            {transitionFields}
+            <CommentSection value={comment} onChange={setComment} required={targetTransition?.requires_note} />
+          </div>
+        );
     }
   };
 
@@ -327,5 +430,50 @@ export function StatusActionDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function TransitionRequirementFields({
+  targetTransition,
+  users,
+  assignedTo,
+  onAssignedToChange,
+  followUpTime,
+  onFollowUpTimeChange,
+  showFollowUp,
+}: {
+  targetTransition?: LifecycleTransitionRule;
+  users: User[];
+  assignedTo: string;
+  onAssignedToChange: (value: string) => void;
+  followUpTime: string;
+  onFollowUpTimeChange: (value: string) => void;
+  showFollowUp?: boolean;
+}) {
+  const requiresAssignment = Boolean(targetTransition?.requires_assignment);
+
+  if (!requiresAssignment && !showFollowUp) return null;
+
+  return (
+    <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
+      {requiresAssignment && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Assign Owner*</label>
+          <UserSelect
+            users={users}
+            value={assignedTo}
+            onSelect={onAssignedToChange}
+            placeholder="Select responsible owner"
+          />
+        </div>
+      )}
+      {showFollowUp && (
+        <FollowUpSection
+          value={followUpTime}
+          onChange={onFollowUpTimeChange}
+          required
+        />
+      )}
+    </div>
   );
 }

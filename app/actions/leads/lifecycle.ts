@@ -88,6 +88,14 @@ interface LifecycleReportsData {
   unassignedCount: number;
   staleAssignmentCount: number;
   recentStatusChanges: LeadLifecycleTimeline["statusHistory"];
+  conversionFunnel: {
+    totalLeads: number;
+    convertedToClient: number;
+    convertedToProject: number;
+    clientConversionRate: number;
+    projectConversionRate: number;
+  };
+  lostReasons: { reason: string; count: number }[];
 }
 
 const LEAD_SUMMARY_SELECT = `
@@ -633,7 +641,7 @@ export async function getLifecycleReports(): Promise<ActionResult<LifecycleRepor
   const staleCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const [leadsResult, groupsResult, historyResult, assignmentResult] = await Promise.all([
-    supabase.from("leads").select("id, source, status, current_status_id, current_owner_id"),
+    supabase.from("leads").select("id, source, status, current_status_id, current_owner_id, lost_reason, converted_to_client_at, converted_to_project_at"),
     getLifecycleStatusGroups(),
     supabase
       .from("lead_status_history")
@@ -664,11 +672,18 @@ export async function getLifecycleReports(): Promise<ActionResult<LifecycleRepor
   let handedOverCount = 0;
   let unassignedCount = 0;
 
+  let convertedToClientCount = 0;
+  let convertedToProjectCount = 0;
+  const lostReasonCounts = new Map<string, number>();
+
   for (const lead of (leadsResult.data || []) as Array<{
     source: string | null;
     status: string;
     current_status_id: string | null;
     current_owner_id: string | null;
+    lost_reason: string | null;
+    converted_to_client_at: string | null;
+    converted_to_project_at: string | null;
   }>) {
     const lifecycle = lead.current_status_id ? statusLookup.get(lead.current_status_id) : null;
     const stageName = lifecycle?.group.name || "Legacy";
@@ -679,12 +694,27 @@ export async function getLifecycleReports(): Promise<ActionResult<LifecycleRepor
     if (statusName === "Lost") lostCount += 1;
     if (statusName === "Handed Over") handedOverCount += 1;
     if (!lead.current_owner_id) unassignedCount += 1;
+    if (lead.converted_to_client_at) convertedToClientCount += 1;
+    if (lead.converted_to_project_at) convertedToProjectCount += 1;
+    if (lead.lost_reason) {
+      const reason = lead.lost_reason.trim() || "Unspecified";
+      lostReasonCounts.set(reason, (lostReasonCounts.get(reason) || 0) + 1);
+    } else if (statusName === "Lost") {
+      lostReasonCounts.set("Unspecified", (lostReasonCounts.get("Unspecified") || 0) + 1);
+    }
   }
+
+  const totalLeads = (leadsResult.data || []).length;
 
   const toSorted = (map: Map<string, number>, keyName: "stage" | "status" | "source") =>
     Array.from(map.entries())
       .map(([key, count]) => ({ [keyName]: key, count }))
       .sort((a, b) => b.count - a.count) as Array<Record<typeof keyName, string> & { count: number }>;
+
+  const clientConversionRate =
+    totalLeads > 0 ? Math.round((convertedToClientCount / totalLeads) * 100) : 0;
+  const projectConversionRate =
+    totalLeads > 0 ? Math.round((convertedToProjectCount / totalLeads) * 100) : 0;
 
   return {
     success: true,
@@ -697,6 +727,16 @@ export async function getLifecycleReports(): Promise<ActionResult<LifecycleRepor
       unassignedCount,
       staleAssignmentCount: assignmentResult.data?.length || 0,
       recentStatusChanges: (historyResult.data || []) as LeadLifecycleTimeline["statusHistory"],
+      conversionFunnel: {
+        totalLeads,
+        convertedToClient: convertedToClientCount,
+        convertedToProject: convertedToProjectCount,
+        clientConversionRate,
+        projectConversionRate,
+      },
+      lostReasons: Array.from(lostReasonCounts.entries())
+        .map(([reason, count]) => ({ reason, count }))
+        .sort((a, b) => b.count - a.count),
     },
   };
 }

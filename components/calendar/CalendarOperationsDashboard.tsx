@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import { Handshake, PhoneCall, Ruler, Truck, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +13,11 @@ import type {
   WorkspaceMeetingItem,
 } from "@/lib/types";
 
+type Scope = "my" | "department" | "all";
+
 interface CalendarOperationsDashboardProps {
+  userId: string;
+  userDepartmentId: string | null;
   data: {
     meetings: WorkspaceMeetingItem[];
     followUps: WorkspaceFollowUpItem[];
@@ -19,7 +26,18 @@ interface CalendarOperationsDashboardProps {
   };
 }
 
-export function CalendarOperationsDashboard({ data }: CalendarOperationsDashboardProps) {
+export function CalendarOperationsDashboard({
+  userId,
+  userDepartmentId,
+  data,
+}: CalendarOperationsDashboardProps) {
+  const [scope, setScope] = useState<Scope>("my");
+
+  const meetings = filterMeetings(data.meetings, scope, userId, userDepartmentId);
+  const followUps = filterFollowUps(data.followUps, scope, userId, userDepartmentId);
+  const measurements = filterMeasurements(data.measurements, scope, userId, userDepartmentId);
+  const installations = filterInstallations(data.installations, scope, userId, userDepartmentId);
+
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 p-4 lg:p-8">
       <header>
@@ -34,9 +52,26 @@ export function CalendarOperationsDashboard({ data }: CalendarOperationsDashboar
         </p>
       </header>
 
+      {/* Scope filter tabs */}
+      <div className="flex gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-800 dark:bg-slate-900 w-fit">
+        {(["my", "department", "all"] as Scope[]).map((s) => (
+          <button
+            key={s}
+            onClick={() => setScope(s)}
+            className={`rounded-lg px-4 py-1.5 text-xs font-black uppercase tracking-widest transition-colors ${
+              scope === s
+                ? "bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100"
+                : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            }`}
+          >
+            {s === "my" ? "My" : s === "department" ? "Department" : "All"}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <CalendarSection title="Meetings" icon={Handshake} count={data.meetings.length}>
-          {data.meetings.map((item) => (
+        <CalendarSection title="Meetings" icon={Handshake} count={meetings.length}>
+          {meetings.map((item) => (
             <CalendarRow
               key={item.id}
               href={`/leads/${item.lead_id}`}
@@ -47,8 +82,8 @@ export function CalendarOperationsDashboard({ data }: CalendarOperationsDashboar
           ))}
         </CalendarSection>
 
-        <CalendarSection title="Follow-ups" icon={PhoneCall} count={data.followUps.length}>
-          {data.followUps.map((item) => (
+        <CalendarSection title="Follow-ups" icon={PhoneCall} count={followUps.length}>
+          {followUps.map((item) => (
             <CalendarRow
               key={item.id}
               href={`/leads/${item.lead_id}`}
@@ -59,8 +94,8 @@ export function CalendarOperationsDashboard({ data }: CalendarOperationsDashboar
           ))}
         </CalendarSection>
 
-        <CalendarSection title="Measurements" icon={Ruler} count={data.measurements.length}>
-          {data.measurements.map((item) => (
+        <CalendarSection title="Measurements" icon={Ruler} count={measurements.length}>
+          {measurements.map((item) => (
             <CalendarRow
               key={item.id}
               href={`/leads/${item.lead_id}`}
@@ -71,8 +106,8 @@ export function CalendarOperationsDashboard({ data }: CalendarOperationsDashboar
           ))}
         </CalendarSection>
 
-        <CalendarSection title="Installations" icon={Truck} count={data.installations.length}>
-          {data.installations.map((lead) => (
+        <CalendarSection title="Installations" icon={Truck} count={installations.length}>
+          {installations.map((lead) => (
             <CalendarRow
               key={lead.id}
               href={`/leads/${lead.id}`}
@@ -86,6 +121,62 @@ export function CalendarOperationsDashboard({ data }: CalendarOperationsDashboar
     </div>
   );
 }
+
+// ── Filter helpers ─────────────────────────────────────────────────────────
+
+function filterMeetings(
+  items: WorkspaceMeetingItem[],
+  scope: Scope,
+  userId: string,
+  deptId: string | null,
+): WorkspaceMeetingItem[] {
+  if (scope === "all") return items;
+  if (scope === "my") return items.filter((i) => i.sales_executive?.id === userId);
+  if (scope === "department" && deptId)
+    return items.filter((i) => i.lead?.current_department_id === deptId);
+  return items;
+}
+
+function filterFollowUps(
+  items: WorkspaceFollowUpItem[],
+  scope: Scope,
+  userId: string,
+  deptId: string | null,
+): WorkspaceFollowUpItem[] {
+  if (scope === "all") return items;
+  if (scope === "my") return items.filter((i) => i.assigned_user?.id === userId);
+  if (scope === "department" && deptId)
+    return items.filter((i) => i.lead?.current_department_id === deptId);
+  return items;
+}
+
+function filterMeasurements(
+  items: WorkspaceMeasurementItem[],
+  scope: Scope,
+  userId: string,
+  deptId: string | null,
+): WorkspaceMeasurementItem[] {
+  if (scope === "all") return items;
+  if (scope === "my") return items.filter((i) => i.measurement_user?.id === userId);
+  if (scope === "department" && deptId)
+    return items.filter((i) => i.lead?.current_department_id === deptId);
+  return items;
+}
+
+function filterInstallations(
+  items: WorkspaceLeadSummary[],
+  scope: Scope,
+  userId: string,
+  deptId: string | null,
+): WorkspaceLeadSummary[] {
+  if (scope === "all") return items;
+  if (scope === "my") return items.filter((i) => i.current_owner?.id === userId);
+  if (scope === "department" && deptId)
+    return items.filter((i) => i.current_department_id === deptId);
+  return items;
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────
 
 function CalendarSection({
   title,

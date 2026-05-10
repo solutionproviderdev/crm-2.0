@@ -1,3 +1,7 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { createAdminClient } from "@/utils/supabase/admin";
+import { createClient } from "@/utils/supabase/server";
 import { getCalendarOperations } from "@/app/actions/leads";
 import { CalendarOperationsDashboard } from "@/components/calendar/CalendarOperationsDashboard";
 
@@ -7,13 +11,34 @@ export const metadata = {
 };
 
 export default async function CalendarPage() {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.user) redirect("/login");
+
+  const adminClient = createAdminClient();
+  const { data: userProfile } = await adminClient
+    .from("users")
+    .select("id, department_id")
+    .eq("id", session.user.id)
+    .single();
+
   const result = await getCalendarOperations();
 
   if (!result.success) {
     return <CalendarError message={result.error} />;
   }
 
-  return <CalendarOperationsDashboard data={result.data} />;
+  return (
+    <CalendarOperationsDashboard
+      userId={session.user.id}
+      userDepartmentId={userProfile?.department_id ?? null}
+      data={result.data}
+    />
+  );
 }
 
 function CalendarError({ message }: { message: string }) {

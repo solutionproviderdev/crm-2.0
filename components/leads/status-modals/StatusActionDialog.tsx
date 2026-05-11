@@ -403,10 +403,11 @@ export function StatusActionDialog({
           <DialogHeader className="sr-only">
             <DialogTitle>Meeting Fixed Appointment Wizard</DialogTitle>
           </DialogHeader>
-          <MeetingFixedWizard 
-            lead={lead} 
+          <MeetingFixedWizard
+            lead={lead}
             onSuccess={() => {
               onClose();
+              onUpdated?.();
             }}
             onCancel={onClose}
           />

@@ -10,6 +10,7 @@ import type {
   ActionResult,
   Department,
   Lead,
+  LeadEventType,
   LeadLifecycleTimeline,
   LifecycleStageCode,
   LifecycleStatusGroup,
@@ -118,6 +119,84 @@ const LEAD_SUMMARY_SELECT = `
 async function getActorClient() {
   const cookieStore = await cookies();
   return createClient(cookieStore);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// logLeadEvent — write a non-status-change event to lead_status_history.
+//
+// The DB trigger handles status_change rows automatically. This function covers
+// every other event type: assignment, follow_up, meeting, support_request, comment.
+//
+// Uses admin client for the write because this is system audit logging — the
+// main action (follow-up insert, reassign, etc.) already went through RLS.
+// actorId is passed explicitly so callers don't re-fetch the session.
+//
+// Fire-and-forget: all errors are caught and swallowed so history logging
+// never breaks a main user action.
+// ─────────────────────────────────────────────────────────────────────────────
+export async function logLeadEvent(input: {
+  leadId: string;
+  actorId?: string | null;
+  eventType: Exclude<LeadEventType, "status_change">;
+  note?: string | null;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    const supabase = createAdminClient();
+
+    // Snapshot current stage/status so the timeline shows context
+    const { data: lead } = await supabase
+      .from("leads")
+      .select("current_stage_id, current_status_id")
+      .eq("id", input.leadId)
+      .single();
+
+    await supabase.from("lead_status_history").insert({
+      lead_id: input.leadId,
+      to_stage_id: lead?.current_stage_id ?? null,
+      to_status_id: lead?.current_status_id ?? null,
+      changed_by: input.actorId ?? null,
+      event_type: input.eventType,
+      note: input.note?.trim() ?? null,
+      metadata: { source: input.eventType, ...(input.metadata ?? {}) },
+    });
+  } catch {
+    // Non-critical — never let history logging break the main action
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// attachStatusNote — attach a user-entered note to the most recent
+// status_change row for a lead (created moments ago by the DB trigger).
+//
+// Called after updateLead() succeeds so the human-readable reason is
+// captured alongside the automatic stage/status snapshot.
+// ─────────────────────────────────────────────────────────────────────────────
+export async function attachStatusNote(
+  leadId: string,
+  note: string,
+): Promise<void> {
+  if (!note.trim()) return;
+  try {
+    const supabase = createAdminClient();
+    const { data: row } = await supabase
+      .from("lead_status_history")
+      .select("id")
+      .eq("lead_id", leadId)
+      .eq("event_type", "status_change")
+      .order("changed_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!row) return;
+
+    await supabase
+      .from("lead_status_history")
+      .update({ note: note.trim() })
+      .eq("id", row.id);
+  } catch {
+    // Non-critical
+  }
 }
 
 export async function getLifecycleStatusGroups(): Promise<
@@ -376,6 +455,24 @@ export async function reassignLeadOwner(
   revalidatePath("/workspace/assignments");
   revalidatePath(`/leads/${input.leadId}`);
 
+  // Log assignment event to lifecycle history (fire-and-forget)
+  const { data: newOwner } = await supabase
+    .from("users")
+    .select("name")
+    .eq("id", input.assignedTo)
+    .single();
+  await logLeadEvent({
+    leadId: input.leadId,
+    actorId: actorId,
+    eventType: "assignment",
+    note: input.reason,
+    metadata: {
+      assigned_to_id: input.assignedTo,
+      assigned_to_name: newOwner?.name ?? null,
+      previous_owner_id: lead.current_owner_id,
+    },
+  });
+
   return { success: true, data: true };
 }
 
@@ -503,6 +600,19 @@ export async function createSupportRequest(
   updateTag(CACHE_TAGS.LEAD_DETAILS(input.leadId));
   revalidatePath("/workspace/support-requests");
   revalidatePath(`/leads/${input.leadId}`);
+
+  // Log support_request event to lifecycle history (fire-and-forget)
+  await logLeadEvent({
+    leadId: input.leadId,
+    actorId: actorId,
+    eventType: "support_request",
+    note: input.subject.trim(),
+    metadata: {
+      description: input.description?.trim() ?? null,
+      priority: input.priority ?? "normal",
+      assigned_to: input.assignedTo ?? null,
+    },
+  });
 
   return { success: true, data: true };
 }

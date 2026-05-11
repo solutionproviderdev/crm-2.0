@@ -6,6 +6,7 @@ import { createClient } from "@/utils/supabase/server";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { logLeadActivity } from "@/lib/lead-activity-logger";
 import { addLeadComment } from "./mutations";
+import { logLeadEvent } from "./lifecycle";
 import type { ActionResult, Lead, LeadMeeting } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -482,6 +483,20 @@ export async function completeMeeting(params: {
     metadata: { to: "Meeting Complete" },
   });
 
+  // Log meeting event to lifecycle history (fire-and-forget)
+  await logLeadEvent({
+    leadId: params.leadId,
+    actorId: user.id,
+    eventType: "meeting",
+    note: params.comment || "Meeting completed",
+    metadata: {
+      outcome: "completed",
+      meeting_id: params.meetingId,
+      project_value: params.projectValue,
+      clients_budget: params.clientsBudget,
+    },
+  });
+
   return { success: true, data: true };
 }
 
@@ -558,6 +573,23 @@ export async function markAsSold(params: {
     actorId: user.id,
     action: "lead.status_changed",
     metadata: { to: "Sold" },
+  });
+
+  // Log meeting/sale event to lifecycle history (fire-and-forget)
+  await logLeadEvent({
+    leadId: params.leadId,
+    actorId: user.id,
+    eventType: "meeting",
+    note: params.comment || "Lead marked as sold",
+    metadata: {
+      outcome: "sold",
+      meeting_id: params.meetingId,
+      project_value: params.projectValue,
+      sold_amount: params.soldAmount,
+      sold_date: params.soldDate,
+      payment_amount: params.paymentAmount,
+      payment_method: params.paymentMethod,
+    },
   });
 
   return { success: true, data: true };

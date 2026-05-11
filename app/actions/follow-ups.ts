@@ -6,6 +6,7 @@ import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { addLeadComment } from "@/app/actions/leads/mutations";
+import { logLeadEvent } from "@/app/actions/leads/lifecycle";
 import type { ActionResult, LeadFollowUp } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -161,6 +162,19 @@ export async function addLeadFollowUp(params: {
   revalidatePath(`/leads/${params.leadId}`);
   revalidatePath("/reminders");
   revalidatePath("/meetings/slots");
+
+  // Log follow_up event to lifecycle history (fire-and-forget)
+  await logLeadEvent({
+    leadId: params.leadId,
+    actorId: user.id,
+    eventType: "follow_up",
+    note: params.comment ?? null,
+    metadata: {
+      type,
+      scheduled_at: params.time,
+      assigned_to: assignedTo,
+    },
+  });
 
   return { success: true, data: data as LeadFollowUp };
 }

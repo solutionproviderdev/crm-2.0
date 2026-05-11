@@ -11,12 +11,13 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { Lead, LifecycleTransitionRule, UpdateLeadInput, User } from "@/lib/types";
-import { 
-  addLeadComment, 
-  addLeadPhone, 
-  completeMeeting, 
+import {
+  addLeadComment,
+  addLeadPhone,
+  attachStatusNote,
+  completeMeeting,
   createSupportRequest,
-  markAsSold, 
+  markAsSold,
   updateLead,
   updateLeadProjectStatus
 } from "@/app/actions/leads";
@@ -141,35 +142,38 @@ export function StatusActionDialog({
           if (result.success) {
             await addLeadComment(lead.id, comment || `Status changed to ${targetStatus}`);
             await updateLead(lead.id, buildStatusUpdate());
+            await attachStatusNote(lead.id, comment || `Phone number collected`);
           }
           break;
 
         case "Call Reschedule":
         case "Call Rescheduled":
         case "Message Rescheduled":
-          result = await addLeadFollowUp({ 
-            leadId: lead.id, 
-            time: followUpTime, 
-            comment: comment 
+          result = await addLeadFollowUp({
+            leadId: lead.id,
+            time: followUpTime,
+            comment: comment
           });
           if (result.success) {
             await updateLead(lead.id, buildStatusUpdate());
+            await attachStatusNote(lead.id, comment || `Follow-up scheduled`);
           }
           break;
 
         case "Ongoing":
           result = await updateLeadProjectStatus(
-            lead.id, 
-            projectStatus.status, 
-            projectStatus.subStatus, 
+            lead.id,
+            projectStatus.status,
+            projectStatus.subStatus,
             comment
           );
           if (result.success && (targetStatusId || targetStageId)) {
             await updateLead(lead.id, buildStatusUpdate());
+            await attachStatusNote(lead.id, comment || `Status set to Ongoing`);
           }
           break;
 
-        case "Meeting Complete":
+        case "Meeting Complete": {
           const meetingId = lead.meetings?.[0]?.id;
           if (!meetingId) {
             toast.error("No active meeting found to complete");
@@ -186,10 +190,12 @@ export function StatusActionDialog({
           });
           if (result.success && (targetStatusId || targetStageId)) {
             await updateLead(lead.id, buildStatusUpdate());
+            await attachStatusNote(lead.id, comment || `Meeting completed`);
           }
           break;
+        }
 
-        case "Sold":
+        case "Sold": {
           const activeMeetingId = lead.meetings?.[0]?.id;
           if (!activeMeetingId) {
             toast.error("No active meeting found to mark as sold");
@@ -214,8 +220,10 @@ export function StatusActionDialog({
             (targetTransition?.requires_assignment || targetStatusId || targetStageId)
           ) {
             await updateLead(lead.id, buildStatusUpdate());
+            await attachStatusNote(lead.id, comment || `Lead marked as sold`);
           }
           break;
+        }
 
         case "Prospect":
           result = await updateLead(lead.id, buildStatusUpdate({
@@ -228,30 +236,35 @@ export function StatusActionDialog({
           if (result.success) {
             await addLeadComment(lead.id, comment);
             await addLeadFollowUp({ leadId: lead.id, time: followUpTime });
+            await attachStatusNote(lead.id, comment || `Marked as prospect`);
           }
           break;
 
         case "Need Support":
           result = await updateLead(lead.id, buildStatusUpdate());
           if (result.success) {
-            await addLeadComment(lead.id, comment || "Support requested");
+            const supportNote = comment || "Support requested";
+            await addLeadComment(lead.id, supportNote);
             await createSupportRequest({
               leadId: lead.id,
               subject: `Support needed: ${lead.name}`,
-              description: comment || "Support requested from lifecycle transition.",
+              description: supportNote,
               priority:
                 lead.priority === "urgent" || lead.priority === "high"
                   ? lead.priority
                   : "normal",
               assignedTo: assignedTo || undefined,
             });
+            await attachStatusNote(lead.id, supportNote);
           }
           break;
 
         default:
           result = await updateLead(lead.id, buildStatusUpdate());
           if (result.success) {
-            await addLeadComment(lead.id, comment || `Status changed to ${targetStatus}`);
+            const defaultNote = comment || `Status changed to ${targetStatus}`;
+            await addLeadComment(lead.id, defaultNote);
+            await attachStatusNote(lead.id, defaultNote);
             if (targetTransition?.requires_follow_up) {
               await addLeadFollowUp({ leadId: lead.id, time: followUpTime, comment });
             }

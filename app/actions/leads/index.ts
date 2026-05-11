@@ -27,6 +27,8 @@ export {
   getLifecycleReports,
   updatePipelineStatus,
   updateStatusTransition,
+  logLeadEvent,
+  attachStatusNote,
 } from "./lifecycle";
 
 export {

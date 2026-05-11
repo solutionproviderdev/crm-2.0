@@ -138,6 +138,14 @@ export interface LifecycleTransitionRule {
   requires_follow_up: boolean;
 }
 
+export type LeadEventType =
+  | "status_change"
+  | "assignment"
+  | "follow_up"
+  | "meeting"
+  | "support_request"
+  | "comment";
+
 export interface LeadLifecycleStatusHistory {
   id: string;
   lead_id: string;
@@ -147,6 +155,7 @@ export interface LeadLifecycleStatusHistory {
   to_status_id: string | null;
   changed_by: string | null;
   changed_at: string;
+  event_type: LeadEventType;
   note: string | null;
   metadata: Record<string, unknown>;
   from_stage?: Pick<LifecycleStatusGroup, "id" | "code" | "name"> | null;

@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   Activity,
   ArrowLeft,
+  ArrowRight,
   BriefcaseBusiness,
   CalendarDays,
   CheckCircle2,
@@ -11,11 +12,13 @@ import {
   Coins,
   FileText,
   FolderKanban,
+  HandHelping,
   History,
   Home,
   MessageCircle,
   Package,
   Phone,
+  PhoneCall,
   Ruler,
   ShieldCheck,
   UserRound,
@@ -31,6 +34,7 @@ import { cn } from "@/utils/cn";
 import type {
   Department,
   Lead,
+  LeadEventType,
   LeadLifecycleTimeline,
   LifecycleStageCode,
   LifecycleStatusGroup,
@@ -433,6 +437,85 @@ function ActivityPanel({
   );
 }
 
+// ── Event type display config ─────────────────────────────────────────────
+const EVENT_CONFIG: Record<
+  LeadEventType,
+  { label: string; icon: LucideIcon; color: string; dot: string }
+> = {
+  status_change: {
+    label: "Status",
+    icon: ArrowRight,
+    color: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
+    dot: "bg-blue-400",
+  },
+  assignment: {
+    label: "Assigned",
+    icon: UserRound,
+    color: "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
+    dot: "bg-violet-400",
+  },
+  follow_up: {
+    label: "Follow-up",
+    icon: PhoneCall,
+    color: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+    dot: "bg-amber-400",
+  },
+  meeting: {
+    label: "Meeting",
+    icon: CheckCircle2,
+    color: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300",
+    dot: "bg-green-400",
+  },
+  support_request: {
+    label: "Support",
+    icon: HandHelping,
+    color: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+    dot: "bg-red-400",
+  },
+  comment: {
+    label: "Note",
+    icon: MessageCircle,
+    color: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+    dot: "bg-slate-400",
+  },
+};
+
+function getEventTitle(item: LeadLifecycleTimeline["statusHistory"][number]): string {
+  const type = item.event_type ?? "status_change";
+  if (type === "status_change") return item.to_status?.name || "Status changed";
+  if (type === "assignment") return item.note || "Reassigned";
+  if (type === "follow_up") return "Follow-up scheduled";
+  if (type === "meeting") {
+    const outcome = (item.metadata as Record<string, unknown>)?.outcome;
+    return outcome === "sold" ? "Lead marked as sold" : "Meeting completed";
+  }
+  if (type === "support_request") return item.note || "Support requested";
+  return item.note || "Activity recorded";
+}
+
+function getEventSubtitle(item: LeadLifecycleTimeline["statusHistory"][number]): string {
+  const type = item.event_type ?? "status_change";
+  if (type === "status_change")
+    return `${item.from_status?.name || "Initial"} → ${item.to_status?.name || "Unknown"}`;
+  if (type === "assignment") {
+    const meta = item.metadata as Record<string, unknown>;
+    return meta?.assigned_to_name ? `Assigned to ${meta.assigned_to_name}` : "";
+  }
+  if (type === "follow_up") {
+    const meta = item.metadata as Record<string, unknown>;
+    return meta?.type ? `Type: ${meta.type}` : "";
+  }
+  if (type === "meeting") {
+    const meta = item.metadata as Record<string, unknown>;
+    return meta?.project_value ? `Project value: ${meta.project_value}` : "";
+  }
+  if (type === "support_request") {
+    const meta = item.metadata as Record<string, unknown>;
+    return meta?.priority ? `Priority: ${meta.priority}` : "";
+  }
+  return item.to_status?.name || "";
+}
+
 function LifecycleTimelinePanel({
   timeline,
   only,
@@ -448,22 +531,66 @@ function LifecycleTimelinePanel({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm font-black">
           <Activity className="h-4 w-4 text-[var(--brand-primary)]" />
-          {only === "assignments" ? "Assignment Timeline" : only === "status" ? "Status Timeline" : "Lifecycle History"}
+          {only === "assignments" ? "Assignment Timeline" : only === "status" ? "Activity Timeline" : "Lifecycle History"}
         </CardTitle>
       </CardHeader>
       <CardContent className="max-h-[520px] space-y-6 overflow-y-auto">
         {showStatus && (
-          <TimelineSection
-            title="Status Changes"
-            empty="No lifecycle status changes recorded yet."
-            items={timeline.statusHistory.map((item) => ({
-              id: item.id,
-              title: item.to_status?.name || "Status changed",
-              subtitle: `${item.from_status?.name || "Initial"} -> ${item.to_status?.name || "Unknown"}`,
-              meta: `${new Date(item.changed_at).toLocaleString()} by ${item.changed_by_user?.name || "System"}`,
-              note: item.note,
-            }))}
-          />
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Activity</p>
+              <Badge variant="outline" className="rounded-full text-[10px] font-black">
+                {timeline.statusHistory.length}
+              </Badge>
+            </div>
+            {timeline.statusHistory.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900">
+                No lifecycle activity recorded yet.
+              </div>
+            ) : (
+              <div className="space-y-0">
+                {timeline.statusHistory.map((item, index) => {
+                  const type = (item.event_type ?? "status_change") as LeadEventType;
+                  const cfg = EVENT_CONFIG[type] ?? EVENT_CONFIG.status_change;
+                  const Icon = cfg.icon;
+                  return (
+                    <div key={item.id} className="relative pb-5 pl-7">
+                      {index < timeline.statusHistory.length - 1 && (
+                        <div className="absolute left-[7px] top-4 bottom-0 w-px bg-slate-200 dark:bg-slate-800" />
+                      )}
+                      <div className={cn("absolute left-0 top-1 h-3.5 w-3.5 rounded-full border-2 border-white shadow-sm dark:border-slate-950", cfg.dot)} />
+                      <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <Badge className={cn("shrink-0 rounded-full px-2 py-0 text-[10px] font-black", cfg.color)}>
+                                <Icon className="mr-1 h-2.5 w-2.5" />
+                                {cfg.label}
+                              </Badge>
+                              <p className="truncate text-sm font-black text-slate-800 dark:text-slate-100">
+                                {getEventTitle(item)}
+                              </p>
+                            </div>
+                            {getEventSubtitle(item) && (
+                              <p className="mt-0.5 text-xs font-semibold text-slate-500">{getEventSubtitle(item)}</p>
+                            )}
+                          </div>
+                        </div>
+                        <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          {new Date(item.changed_at).toLocaleString()} by {item.changed_by_user?.name || "System"}
+                        </p>
+                        {item.note && type !== "assignment" && type !== "support_request" && (
+                          <p className="mt-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                            {item.note}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         )}
         {showAssignments && (
           <TimelineSection

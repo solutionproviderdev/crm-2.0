@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   Calendar,
@@ -232,8 +233,15 @@ export function LifecycleActionPanel({
   users = [],
   variant = "panel",
 }: LifecycleActionPanelProps) {
+  const router = useRouter();
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [selectedAction, setSelectedAction] = useState<TransitionAction | null>(null);
+
+  // Refresh server components after a successful status transition so the
+  // activity timeline and lead header show the updated state immediately.
+  const handleUpdated = useCallback(() => {
+    router.refresh();
+  }, [router]);
 
   const statusGroups = lifecycleStatusGroups?.length
     ? lifecycleStatusGroups
@@ -320,6 +328,7 @@ export function LifecycleActionPanel({
         <StatusActionDialog
           isOpen={isDialogOpen}
           onClose={() => setDialogOpen(false)}
+          onUpdated={handleUpdated}
           lead={lead}
           targetStatus={selectedAction?.status.name || ""}
           targetStatusId={selectedAction?.status.id}
@@ -390,6 +399,7 @@ export function LifecycleActionPanel({
       <StatusActionDialog
         isOpen={isDialogOpen}
         onClose={() => setDialogOpen(false)}
+        onUpdated={handleUpdated}
         lead={lead}
         targetStatus={selectedAction?.status.name || ""}
         targetStatusId={selectedAction?.status.id}

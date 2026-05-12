@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { getFollowUps } from "@/app/actions/follow-ups";
 import { getAllActiveUsers } from "@/app/actions/leads/queries";
+import { getCurrentUser } from "@/app/actions/auth";
 import RemindersPageContent from "@/components/reminders/RemindersPageContent";
 import { FollowUpWithLead } from "@/lib/types";
 import { format, startOfDay, endOfDay } from "date-fns";
@@ -29,7 +30,7 @@ function RemindersSkeleton() {
           <Skeleton className="h-4 w-32" />
         </div>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {[...Array(6)].map((_, i) => (
           <Skeleton key={i} className="h-48 w-full rounded-2xl" />
@@ -44,14 +45,25 @@ function RemindersSkeleton() {
  * Async component that fetches data. Receives todayStr as a prop so it does
  * NOT need to call `new Date()` or `connection()` itself — the dynamic scope
  * is already established by the outer page reading `searchParams`.
+ *
+ * Non-admin users are scoped to their own follow-ups on the initial server
+ * render via `ownerId`. The client component re-fetches with the same scope
+ * when the date or filters change.
  */
 async function RemindersGridContent({ todayStr, today }: { todayStr: string; today: string }) {
   const todayDate = new Date(today);
 
+  // getCurrentUser is needed to scope the initial server-side fetch for
+  // non-admin users — without this, every user would see all follow-ups.
+  const currentUser = await getCurrentUser();
+  const isAdmin = currentUser?.type === "Admin";
+  const ownerId = isAdmin ? undefined : (currentUser?.id ?? undefined);
+
   const [remindersRes, usersRes] = await Promise.all([
     getFollowUps({
       startDate: startOfDay(todayDate).toISOString(),
-      endDate: endOfDay(todayDate).toISOString()
+      endDate: endOfDay(todayDate).toISOString(),
+      ownerId,
     }),
     getAllActiveUsers()
   ]);
@@ -72,8 +84,8 @@ async function RemindersGridContent({ todayStr, today }: { todayStr: string; tod
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <RemindersPageContent 
-        initialReminders={(remindersRes.data || []) as FollowUpWithLead[]} 
+      <RemindersPageContent
+        initialReminders={(remindersRes.data || []) as FollowUpWithLead[]}
         initialUsers={usersRes.data || []}
         selectedDate={todayStr}
       />

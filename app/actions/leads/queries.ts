@@ -3,6 +3,7 @@
 import { cacheLife, cacheTag } from "next/cache";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { CACHE_TAGS } from "@/lib/cache-tags";
+import { getLifecycleStatusNames } from "./lifecycle";
 import type {
   ActionResult,
   Lead,
@@ -154,13 +155,16 @@ export async function getLeadFilterOptions(): Promise<
 
   const supabase = createAdminClient();
 
-  const { data, error } = await supabase
-    .from("leads")
-    .select("status, source");
+  const [{ data, error }, lifecycleStatusesResult] = await Promise.all([
+    supabase.from("leads").select("source"),
+    getLifecycleStatusNames(),
+  ]);
 
   if (error) return { success: false, error: error.message };
 
-  const statuses = Array.from(new Set(data?.map((l) => l.status) || [])).filter(Boolean);
+  const statuses = lifecycleStatusesResult.success
+    ? Array.from(new Set(lifecycleStatusesResult.data))
+    : [];
   const sources = Array.from(new Set(data?.map((l) => l.source) || [])).filter(Boolean);
 
   return { success: true, data: { statuses, sources } };

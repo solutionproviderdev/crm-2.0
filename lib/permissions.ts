@@ -26,7 +26,7 @@ export const ALL_PERMISSIONS = [
   },
   {
     resource: "Reports",
-    actions: ["Sales Report", "Lead Report", "Finance Report"],
+    actions: ["Lifecycle Report", "Sales Report", "Lead Report", "Finance Report"],
   },
   {
     resource: "Utility",
@@ -34,7 +34,11 @@ export const ALL_PERMISSIONS = [
   },
   {
     resource: "Pipelines",
-    actions: ["Client Pipeline", "Project Pipeline"],
+    actions: ["Lead Pipeline", "Client Pipeline", "Project Pipeline"],
+  },
+  {
+    resource: "Settings",
+    actions: ["Pipeline Settings", "Status Transitions"],
   },
   {
     resource: "Transform Studio",
@@ -49,9 +53,14 @@ export type PermissionMap = Record<string, Record<string, boolean>>;
 export const PUBLIC_DASHBOARD_ROUTES = [
   "/dashboard",
   "/dashboard/profile",
+  "/workspace",
+  "/pipeline",
+  "/calendar",
   "/reminders",
   "/chat",
   "/settings",
+  "/settings/profile",
+  "/settings/security",
 ];
 
 /**
@@ -75,14 +84,19 @@ export const PERMISSION_ROUTE_MAP: Record<string, string> = {
   "Meetings:Daily Meetings":"/meetings/slots",
   "Meetings:Meeting History":"/meetings",
   // Reports
+  "Reports:Lifecycle Report": "/reports",
   "Reports:Sales Report":   "/reports/sales",
-  "Reports:Lead Report":    "/reports/leads",
+  "Reports:Lead Report":    "/reports",
   "Reports:Finance Report": "/reports/finance",
   // Utility
   "Utility:Map Data":       "/utility/map",
   // Pipelines
+  "Pipelines:Lead Pipeline": "/pipeline",
   "Pipelines:Client Pipeline": "/clients",
   "Pipelines:Project Pipeline": "/projects",
+  // Settings
+  "Settings:Pipeline Settings": "/settings/pipeline",
+  "Settings:Status Transitions": "/settings/status-transitions",
   // Transform Studio
   "Transform Studio:Use Transform Studio": "/transform",
   "Transform Studio:Review & Approve Jobs": "/transform",
@@ -112,5 +126,8 @@ export function isRouteAllowed(
 ): boolean {
   if (isAdmin) return true;
   const allowedRoutes = getAllowedRoutes(permissions);
-  return allowedRoutes.some((route) => pathname.startsWith(route));
+  return allowedRoutes.some((route) => {
+    const normalized = route.endsWith("/") ? route.slice(0, -1) : route;
+    return pathname === normalized || pathname.startsWith(`${normalized}/`);
+  });
 }

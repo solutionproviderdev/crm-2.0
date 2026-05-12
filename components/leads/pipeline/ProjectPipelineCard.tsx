@@ -3,16 +3,33 @@
 import Link from "next/link";
 import { cn } from "@/utils/cn";
 import { getStageConfig } from "@/lib/pipeline-stages";
-import type { Lead } from "@/lib/types";
+import type { Lead, LifecycleStatusGroup } from "@/lib/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Phone, DollarSign, ArrowRight, Tag } from "lucide-react";
 
 interface ProjectPipelineCardProps {
   lead: Lead;
+  lifecycleStatusGroups?: LifecycleStatusGroup[];
 }
 
-export function ProjectPipelineCard({ lead }: ProjectPipelineCardProps) {
-  const config = getStageConfig(lead.status);
+const legacyStatusNames: Record<string, string> = {
+  "Call Reschedule": "Call Rescheduled",
+  Close: "Closed",
+  "Mesurement Done": "Measurement Done",
+};
+
+function getLifecycleStatusName(
+  lead: Lead,
+  lifecycleStatusGroups: LifecycleStatusGroup[] = []
+) {
+  const statuses = lifecycleStatusGroups.flatMap((group) => group.statuses);
+  const currentStatus = statuses.find((status) => status.id === lead.current_status_id);
+  return currentStatus?.name ?? legacyStatusNames[lead.status] ?? lead.status;
+}
+
+export function ProjectPipelineCard({ lead, lifecycleStatusGroups }: ProjectPipelineCardProps) {
+  const statusName = getLifecycleStatusName(lead, lifecycleStatusGroups);
+  const config = getStageConfig(statusName);
 
   const soldAmount = lead.finance?.soldAmount ?? 0;
   const totalPayment = lead.finance?.totalPayment ?? 0;

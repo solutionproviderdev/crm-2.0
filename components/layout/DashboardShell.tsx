@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LayoutDashboard, Users, Bell, MessagesSquare, CalendarDays, Wrench, Handshake, Construction, Wand2 } from 'lucide-react';
+import { BarChart3, CalendarDays, Columns3, Inbox, LayoutDashboard, MessagesSquare, Settings, Users } from 'lucide-react';
 import { logout } from '@/app/actions/auth';
 import type { User } from '@/lib/types';
 import type { PermissionMap } from '@/lib/permissions';
@@ -20,15 +20,14 @@ interface NavItem {
 
 const ALL_NAV_ITEMS: NavItem[] = [
 	{ name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+	{ name: 'Workspace', href: '/workspace/inbox', alternateHrefs: ['/workspace'], icon: Inbox },
+	{ name: 'Pipeline', href: '/pipeline/leads', alternateHrefs: ['/pipeline', '/clients', '/projects'], icon: Columns3 },
 	{ name: 'Leads', href: '/leads', alternateHrefs: [], icon: Users },
-	{ name: 'Clients', href: '/clients', icon: Handshake },
-	{ name: 'Projects', href: '/projects', icon: Construction },
-	{ name: 'Reminders', href: '/reminders', icon: Bell },
-	{ name: 'Meetings', href: '/meetings/slots', alternateHrefs: ['/meetings'], icon: CalendarDays },
+	{ name: 'Calendar', href: '/calendar', alternateHrefs: ['/meetings', '/meetings/slots', '/reminders'], icon: CalendarDays },
+	{ name: 'Reports', href: '/reports', alternateHrefs: ['/reports/lifecycle', '/reports/conversion'], icon: BarChart3 },
 	{ name: 'Users', href: '/users', alternateHrefs: ['/users/departments', '/users/roles'], icon: Users },
 	{ name: 'Chat', href: '/chat', icon: MessagesSquare },
-	{ name: 'Transform Studio', href: '/transform', icon: Wand2 },
-	{ name: 'Utility', href: '/utility/map', icon: Wrench },
+	{ name: 'Settings', href: '/settings/profile', alternateHrefs: ['/settings'], icon: Settings },
 ];
 
 interface Props {
@@ -65,13 +64,14 @@ export function DashboardShell({ user, settings, children }: Props) {
 	// Filter nav items based on role permissions.
 	// PUBLIC items (Dashboard, Chat, Reminders) always show.
 	// All other items require at least one matching permission.
-	const ALWAYS_VISIBLE = new Set(['Dashboard', 'Chat', 'Reminders']);
+	const ALWAYS_VISIBLE = new Set(['Dashboard', 'Workspace', 'Pipeline', 'Calendar', 'Chat']);
 
 	const visibleNavItems = ALL_NAV_ITEMS.map(item => {
 		// Always visible items — no permission required
 		if (ALWAYS_VISIBLE.has(item.name)) return item;
 		// Admins see everything
 		if (isAdmin) return item;
+		if (item.name === 'Settings') return { ...item, href: '/settings/profile' };
 
 		// Check if any of this item's routes is permitted
 		const hrefsToCheck = [item.href, ...(item.alternateHrefs || [])];
@@ -86,7 +86,7 @@ export function DashboardShell({ user, settings, children }: Props) {
 	}
 
 	return (
-		<div className="flex flex-col h-dvh overflow-hidden bg-[#f8fafc] w-full">
+		<div className="flex flex-col h-dvh overflow-hidden bg-background text-foreground w-full">
 			{/* ── Top Navbar ─────────────────────────────── */}
 			<TopNavbar
 				user={user}

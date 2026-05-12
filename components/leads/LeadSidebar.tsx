@@ -1,10 +1,14 @@
 "use client";
 
-import { Lead, User as UserType } from "@/lib/types";
+import {
+  Lead,
+  User as UserType,
+  type LifecycleStatusGroup,
+  type LifecycleTransitionRule,
+} from "@/lib/types";
 import { 
   Sheet, 
   SheetContent, 
-  SheetHeader, 
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -41,15 +45,19 @@ interface LeadSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   allUsers: UserType[];
+  lifecycleStatusGroups?: LifecycleStatusGroup[];
+  lifecycleTransitionRules?: LifecycleTransitionRule[];
 }
 
-export function LeadSidebar({ lead, isOpen, onClose, allUsers }: LeadSidebarProps) {
+export function LeadSidebar({
+  lead,
+  isOpen,
+  onClose,
+  allUsers,
+  lifecycleStatusGroups,
+  lifecycleTransitionRules,
+}: LeadSidebarProps) {
   if (!lead) return null;
-
-  // Finance calculation
-  const projectValue = lead.finance?.projectValue || 0;
-  const totalPaid = lead.payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
-  const totalDue = projectValue - totalPaid;
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -95,7 +103,12 @@ export function LeadSidebar({ lead, isOpen, onClose, allUsers }: LeadSidebarProp
                 <Activity className="w-4 h-4 text-[var(--brand-primary)]" />
                 <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Pipeline & Status</span>
               </div>
-              <LeadStatusControl lead={lead} />
+              <LeadStatusControl
+                lead={lead}
+                lifecycleStatusGroups={lifecycleStatusGroups}
+                lifecycleTransitionRules={lifecycleTransitionRules}
+                users={allUsers}
+              />
             </section>
 
             <Separator className="bg-slate-100" />

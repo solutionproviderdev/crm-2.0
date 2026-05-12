@@ -4,7 +4,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { cn } from "@/utils/cn";
 import { getStageConfig } from "@/lib/pipeline-stages";
-import type { Lead } from "@/lib/types";
+import type { Lead, LifecycleStatusGroup } from "@/lib/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Phone,
@@ -16,10 +16,27 @@ import {
 
 interface ClientPipelineCardProps {
   lead: Lead;
+  lifecycleStatusGroups?: LifecycleStatusGroup[];
 }
 
-export function ClientPipelineCard({ lead }: ClientPipelineCardProps) {
-  const config = getStageConfig(lead.status);
+const legacyStatusNames: Record<string, string> = {
+  "Call Reschedule": "Call Rescheduled",
+  Close: "Closed",
+  "Mesurement Done": "Measurement Done",
+};
+
+function getLifecycleStatusName(
+  lead: Lead,
+  lifecycleStatusGroups: LifecycleStatusGroup[] = []
+) {
+  const statuses = lifecycleStatusGroups.flatMap((group) => group.statuses);
+  const currentStatus = statuses.find((status) => status.id === lead.current_status_id);
+  return currentStatus?.name ?? legacyStatusNames[lead.status] ?? lead.status;
+}
+
+export function ClientPipelineCard({ lead, lifecycleStatusGroups }: ClientPipelineCardProps) {
+  const statusName = getLifecycleStatusName(lead, lifecycleStatusGroups);
+  const config = getStageConfig(statusName);
   const nextMeeting = lead.meetings && lead.meetings.length > 0 ? lead.meetings[0] : null;
   const budget = lead.finance?.clientsBudget ?? lead.finance?.projectValue;
   const soldAmount = lead.finance?.soldAmount;

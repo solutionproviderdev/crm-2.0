@@ -9,8 +9,10 @@
  */
 
 import {
+  Archive,
   Calendar,
   CheckCircle2,
+  Clock,
   FileText,
   Eye,
   Handshake,
@@ -22,8 +24,21 @@ import {
   CheckCircle,
   Truck,
   MapPin,
+  MessageSquare,
+  PhoneCall,
+  HelpCircle,
   type LucideIcon,
 } from "lucide-react";
+
+export const LEAD_STAGES = [
+  "New",
+  "Message Rescheduled",
+  "Number Collected",
+  "Call Rescheduled",
+  "Ongoing",
+  "Need Support",
+  "Meeting Fixed",
+] as const;
 
 export const SALES_STAGES = [
   "Meeting Fixed",
@@ -32,11 +47,12 @@ export const SALES_STAGES = [
   "Prospect",
   "Sold",
   "Lost",
-  "Mesurement Done",
+  "Closed",
+  "Measurement Scheduled",
+  "Measurement Done",
 ] as const;
 
 export const IMPLEMENTATION_STAGES = [
-  "Mesurement Done",
   "Material Ordered",
   "Material Received",
   "Making",
@@ -44,11 +60,13 @@ export const IMPLEMENTATION_STAGES = [
   "Out for Installation",
   "Installation Completed",
   "Handed Over",
+  "Closed",
 ] as const;
 
+export type LeadStage = (typeof LEAD_STAGES)[number];
 export type SalesStage = (typeof SALES_STAGES)[number];
 export type ImplementationStage = (typeof IMPLEMENTATION_STAGES)[number];
-export type PipelineStage = SalesStage | ImplementationStage;
+export type PipelineStage = LeadStage | SalesStage | ImplementationStage;
 
 export interface StageConfig {
   icon: LucideIcon;
@@ -59,6 +77,48 @@ export interface StageConfig {
 }
 
 export const STAGE_CONFIG: Record<string, StageConfig> = {
+  New: {
+    icon: FileText,
+    color: "text-slate-700",
+    bg: "bg-slate-50",
+    border: "border-slate-200",
+    headerBg: "bg-slate-100",
+  },
+  "Message Rescheduled": {
+    icon: MessageSquare,
+    color: "text-sky-700",
+    bg: "bg-sky-50",
+    border: "border-sky-200",
+    headerBg: "bg-sky-100",
+  },
+  "Number Collected": {
+    icon: PhoneCall,
+    color: "text-emerald-700",
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+    headerBg: "bg-emerald-100",
+  },
+  "Call Rescheduled": {
+    icon: Calendar,
+    color: "text-amber-700",
+    bg: "bg-amber-50",
+    border: "border-amber-200",
+    headerBg: "bg-amber-100",
+  },
+  Ongoing: {
+    icon: Hammer,
+    color: "text-orange-700",
+    bg: "bg-orange-50",
+    border: "border-orange-200",
+    headerBg: "bg-orange-100",
+  },
+  "Need Support": {
+    icon: HelpCircle,
+    color: "text-rose-700",
+    bg: "bg-rose-50",
+    border: "border-rose-200",
+    headerBg: "bg-rose-100",
+  },
   "Meeting Fixed": {
     icon: Calendar,
     color: "text-indigo-700",
@@ -101,12 +161,26 @@ export const STAGE_CONFIG: Record<string, StageConfig> = {
     border: "border-red-200",
     headerBg: "bg-red-100",
   },
-  "Mesurement Done": {
+  "Measurement Scheduled": {
+    icon: Clock,
+    color: "text-sky-700",
+    bg: "bg-sky-50",
+    border: "border-sky-200",
+    headerBg: "bg-sky-100",
+  },
+  "Measurement Done": {
     icon: Ruler,
     color: "text-teal-700",
     bg: "bg-teal-50",
     border: "border-teal-200",
     headerBg: "bg-teal-100",
+  },
+  Closed: {
+    icon: Archive,
+    color: "text-slate-500",
+    bg: "bg-slate-50",
+    border: "border-slate-200",
+    headerBg: "bg-slate-100",
   },
   "Material Ordered": {
     icon: Package,

@@ -3,9 +3,11 @@
 import { revalidatePath, updateTag } from "next/cache";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { logLeadActivity } from "@/lib/lead-activity-logger";
 import { addLeadComment } from "./mutations";
+import { logLeadEvent } from "./lifecycle";
 import type { ActionResult, Lead, LeadMeeting } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -351,18 +353,24 @@ export async function fixMeetingForLead(params: {
   } = await supabase.auth.getUser();
   if (!user) return { success: false, error: "Not authenticated" };
 
-  // Fetch previous status for diff
-  const { data: prev } = await supabase
-    .from("leads")
-    .select("status")
-    .eq("id", params.leadId)
-    .single();
+  // Fetch previous status + resolve Meeting Fixed status/stage IDs for trigger
+  const adminClient = createAdminClient();
+  const [{ data: prev }, { data: meetingFixedStatus }] = await Promise.all([
+    supabase.from("leads").select("status").eq("id", params.leadId).single(),
+    adminClient
+      .from("pipeline_statuses")
+      .select("id, stage_id")
+      .eq("name", "Meeting Fixed")
+      .single(),
+  ]);
 
-  // Step 1: Update the Lead
+  // Step 1: Update the Lead — include current_status_id so the history trigger fires
   const { error: lErr } = await supabase
     .from("leads")
     .update({
       status: "Meeting Fixed",
+      current_status_id: meetingFixedStatus?.id ?? null,
+      current_stage_id: meetingFixedStatus?.stage_id ?? null,
       address: params.address,
       project_status: params.projectStatus,
       requirements: params.requirements,
@@ -410,6 +418,41 @@ export async function fixMeetingForLead(params: {
       salesExecutiveId: params.meetingData.sales_executive_id,
     },
   });
+
+  // Attach comment to the trigger-created history row + log meeting event
+  await Promise.all([
+    params.comment
+      ? (async () => {
+          const { data: row } = await adminClient
+            .from("lead_status_history")
+            .select("id")
+            .eq("lead_id", params.leadId)
+            .eq("event_type", "status_change")
+            .order("changed_at", { ascending: false })
+            .limit(1)
+            .single();
+          if (row) {
+            await adminClient
+              .from("lead_status_history")
+              .update({ note: params.comment!.trim() })
+              .eq("id", row.id);
+          }
+        })()
+      : Promise.resolve(),
+    logLeadEvent({
+      leadId: params.leadId,
+      actorId: user.id,
+      eventType: "meeting",
+      note: params.comment || "Meeting fixed",
+      metadata: {
+        outcome: "fixed",
+        meeting_id: meeting.id,
+        date: params.meetingData.date,
+        slot: params.meetingData.slot,
+        sales_executive_id: params.meetingData.sales_executive_id,
+      },
+    }),
+  ]);
 
   return { success: true, data: meeting as LeadMeeting };
 }
@@ -480,6 +523,20 @@ export async function completeMeeting(params: {
     actorId: user.id,
     action: "lead.status_changed",
     metadata: { to: "Meeting Complete" },
+  });
+
+  // Log meeting event to lifecycle history (fire-and-forget)
+  await logLeadEvent({
+    leadId: params.leadId,
+    actorId: user.id,
+    eventType: "meeting",
+    note: params.comment || "Meeting completed",
+    metadata: {
+      outcome: "completed",
+      meeting_id: params.meetingId,
+      project_value: params.projectValue,
+      clients_budget: params.clientsBudget,
+    },
   });
 
   return { success: true, data: true };
@@ -558,6 +615,23 @@ export async function markAsSold(params: {
     actorId: user.id,
     action: "lead.status_changed",
     metadata: { to: "Sold" },
+  });
+
+  // Log meeting/sale event to lifecycle history (fire-and-forget)
+  await logLeadEvent({
+    leadId: params.leadId,
+    actorId: user.id,
+    eventType: "meeting",
+    note: params.comment || "Lead marked as sold",
+    metadata: {
+      outcome: "sold",
+      meeting_id: params.meetingId,
+      project_value: params.projectValue,
+      sold_amount: params.soldAmount,
+      sold_date: params.soldDate,
+      payment_amount: params.paymentAmount,
+      payment_method: params.paymentMethod,
+    },
   });
 
   return { success: true, data: true };

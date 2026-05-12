@@ -105,6 +105,164 @@ export interface LeadActivityLog {
   lead?: Pick<Lead, "id" | "name" | "cid"> | null;
 }
 
+export type LifecycleStageCode = "lead" | "client" | "project";
+
+export interface LifecycleStatusOption {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  default_department_id: string | null;
+  is_terminal: boolean;
+  is_conversion_point: boolean;
+}
+
+export interface LifecycleStatusGroup {
+  id: string;
+  code: LifecycleStageCode;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  statuses: LifecycleStatusOption[];
+}
+
+export interface LifecycleTransitionRule {
+  id: string;
+  from_status_id: string | null;
+  to_status_id: string;
+  allowed_department_id: string | null;
+  allowed_role_id: string | null;
+  requires_note: boolean;
+  requires_assignment: boolean;
+  requires_follow_up: boolean;
+}
+
+export type LeadEventType =
+  | "status_change"
+  | "assignment"
+  | "follow_up"
+  | "meeting"
+  | "support_request"
+  | "comment";
+
+export interface LeadLifecycleStatusHistory {
+  id: string;
+  lead_id: string;
+  from_stage_id: string | null;
+  to_stage_id: string | null;
+  from_status_id: string | null;
+  to_status_id: string | null;
+  changed_by: string | null;
+  changed_at: string;
+  event_type: LeadEventType;
+  note: string | null;
+  metadata: Record<string, unknown>;
+  from_stage?: Pick<LifecycleStatusGroup, "id" | "code" | "name"> | null;
+  to_stage?: Pick<LifecycleStatusGroup, "id" | "code" | "name"> | null;
+  from_status?: Pick<LifecycleStatusOption, "id" | "code" | "name"> | null;
+  to_status?: Pick<LifecycleStatusOption, "id" | "code" | "name"> | null;
+  changed_by_user?: Pick<User, "id" | "name" | "profile_picture"> | null;
+}
+
+export interface LeadLifecycleAssignment {
+  id: string;
+  lead_id: string;
+  stage_id: string | null;
+  status_id: string | null;
+  department_id: string | null;
+  assigned_to: string | null;
+  assigned_by: string | null;
+  assigned_at: string;
+  unassigned_at: string | null;
+  is_current: boolean;
+  reason: string | null;
+  metadata: Record<string, unknown>;
+  stage?: Pick<LifecycleStatusGroup, "id" | "code" | "name"> | null;
+  status?: Pick<LifecycleStatusOption, "id" | "code" | "name"> | null;
+  department?: Department | null;
+  assigned_user?: Pick<User, "id" | "name" | "profile_picture"> | null;
+  assigned_by_user?: Pick<User, "id" | "name" | "profile_picture"> | null;
+}
+
+export interface LeadLifecycleTimeline {
+  statusHistory: LeadLifecycleStatusHistory[];
+  assignments: LeadLifecycleAssignment[];
+}
+
+export interface WorkspaceLeadSummary {
+  id: string;
+  cid: string | null;
+  name: string;
+  status: string;
+  current_status_id?: string | null;
+  current_owner_id?: string | null;
+  current_department_id?: string | null;
+  priority?: "low" | "normal" | "high" | "urgent";
+  source: LeadSource;
+  phones: string[];
+  created_at: string;
+  current_owner?: Pick<User, "id" | "name" | "profile_picture"> | null;
+  cre?: Pick<User, "id" | "name" | "profile_picture"> | null;
+  sales_executive?: Pick<User, "id" | "name" | "profile_picture"> | null;
+}
+
+export interface WorkspaceFollowUpItem extends LeadFollowUp {
+  lead?: WorkspaceLeadSummary | null;
+  assigned_user?: Pick<User, "id" | "name" | "profile_picture"> | null;
+}
+
+export type WorkspaceMeetingItem = Omit<LeadMeeting, "lead" | "sales_executive"> & {
+  lead?: WorkspaceLeadSummary | null;
+  sales_executive?: Pick<User, "id" | "name" | "profile_picture"> | null;
+};
+
+export interface WorkspaceSupportRequest {
+  id: string;
+  lead_id: string;
+  requested_by: string | null;
+  assigned_to: string | null;
+  department_id: string | null;
+  priority: "low" | "normal" | "high" | "urgent";
+  subject: string;
+  description: string | null;
+  status: "open" | "in_progress" | "resolved" | "cancelled";
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+  lead?: WorkspaceLeadSummary | null;
+  requested_by_user?: Pick<User, "id" | "name" | "profile_picture"> | null;
+  assigned_user?: Pick<User, "id" | "name" | "profile_picture"> | null;
+  department?: Department | null;
+}
+
+export interface WorkspaceMeasurementItem {
+  id: string;
+  lead_id: string;
+  client_id: string | null;
+  scheduled_at: string | null;
+  measured_at: string | null;
+  measurement_by: string | null;
+  status: "scheduled" | "rescheduled" | "done" | "cancelled";
+  notes: string | null;
+  files: string[];
+  created_at: string;
+  updated_at: string;
+  lead?: WorkspaceLeadSummary | null;
+  measurement_user?: Pick<User, "id" | "name" | "profile_picture"> | null;
+}
+
+export interface WorkspaceInboxData {
+  myTasks: WorkspaceLeadSummary[];
+  unassignedRecords: WorkspaceLeadSummary[];
+  overdueFollowUps: WorkspaceFollowUpItem[];
+  dueTodayFollowUps: WorkspaceFollowUpItem[];
+  supportRequests: WorkspaceSupportRequest[];
+  todayMeetings: WorkspaceMeetingItem[];
+  upcomingMeasurements: WorkspaceMeasurementItem[];
+  upcomingInstallations: WorkspaceLeadSummary[];
+}
+
 
 // ── Form Input Types ────────────────────────────────────────────────────────
 
@@ -206,6 +364,16 @@ export interface Lead {
   cid: string | null;
   name: string;
   status: string;
+  current_stage_id?: string | null;
+  current_status_id?: string | null;
+  current_owner_id?: string | null;
+  current_department_id?: string | null;
+  priority?: "low" | "normal" | "high" | "urgent";
+  lost_reason?: string | null;
+  close_reason?: string | null;
+  closed_at?: string | null;
+  converted_to_client_at?: string | null;
+  converted_to_project_at?: string | null;
   source: LeadSource;
   profile_picture: string | null;
   phones: string[];
@@ -291,6 +459,16 @@ export type UpdateLeadInput = Partial<Omit<CreateLeadInput, "source" | "name">> 
   name?: string;
   source?: string;
   status?: string;
+  current_stage_id?: string | null;
+  current_status_id?: string | null;
+  current_owner_id?: string | null;
+  current_department_id?: string | null;
+  priority?: "low" | "normal" | "high" | "urgent";
+  lost_reason?: string | null;
+  close_reason?: string | null;
+  closed_at?: string | null;
+  converted_to_client_at?: string | null;
+  converted_to_project_at?: string | null;
   updated_at?: string;
 };
 

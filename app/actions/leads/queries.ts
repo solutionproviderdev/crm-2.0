@@ -163,7 +163,7 @@ export async function getLeadFilterOptions(): Promise<
   if (error) return { success: false, error: error.message };
 
   const statuses = lifecycleStatusesResult.success
-    ? lifecycleStatusesResult.data
+    ? Array.from(new Set(lifecycleStatusesResult.data))
     : [];
   const sources = Array.from(new Set(data?.map((l) => l.source) || [])).filter(Boolean);
 

@@ -1,7 +1,6 @@
 import { Suspense } from 'react';
 import { LeadsPageContent } from '@/components/leads/LeadsPageContent';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format } from 'date-fns';
 import {
   getFilteredLeads,
   getLeadFilterOptions,
@@ -52,7 +51,6 @@ async function LeadsContent({
   const isAdmin = user?.type === 'Admin';
   const userId = user?.id;
 
-  const today = format(new Date(), 'yyyy-MM-dd');
   const filterParams = {
     page: params.page ? parseInt(params.page) : 1,
     limit: params.limit ? parseInt(params.limit) : 20,
@@ -61,8 +59,8 @@ async function LeadsContent({
     creId: params.creId === 'all' ? undefined : params.creId,
     salesExecutiveId: params.salesId === 'all' ? undefined : params.salesId,
     search: params.search || undefined,
-    startDate: params.search ? params.startDate : (params.startDate || today),
-    endDate: params.search ? params.endDate : (params.endDate || today),
+    startDate: params.startDate || undefined,
+    endDate: params.endDate || undefined,
     sortBy: params.sortBy || 'created_at',
     sortOrder: (params.order as 'asc' | 'desc') || 'desc',
     userId,

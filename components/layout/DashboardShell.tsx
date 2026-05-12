@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { BarChart3, CalendarDays, Columns3, Inbox, LayoutDashboard, MessagesSquare, Settings, Users } from 'lucide-react';
+import { BarChart3, Bell, CalendarDays, Columns3, Inbox, LayoutDashboard, MessagesSquare, Settings, Users } from 'lucide-react';
 import { logout } from '@/app/actions/auth';
 import type { User } from '@/lib/types';
 import type { PermissionMap } from '@/lib/permissions';
@@ -23,7 +23,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
 	{ name: 'Workspace', href: '/workspace/inbox', alternateHrefs: ['/workspace'], icon: Inbox },
 	{ name: 'Pipeline', href: '/pipeline/leads', alternateHrefs: ['/pipeline', '/clients', '/projects'], icon: Columns3 },
 	{ name: 'Leads', href: '/leads', alternateHrefs: [], icon: Users },
-	{ name: 'Calendar', href: '/calendar', alternateHrefs: ['/meetings', '/meetings/slots', '/reminders'], icon: CalendarDays },
+	{ name: 'Reminders', href: '/reminders', icon: Bell },
+	{ name: 'Calendar', href: '/calendar', alternateHrefs: ['/meetings', '/meetings/slots'], icon: CalendarDays },
 	{ name: 'Reports', href: '/reports', alternateHrefs: ['/reports/lifecycle', '/reports/conversion'], icon: BarChart3 },
 	{ name: 'Users', href: '/users', alternateHrefs: ['/users/departments', '/users/roles'], icon: Users },
 	{ name: 'Chat', href: '/chat', icon: MessagesSquare },
@@ -64,14 +65,13 @@ export function DashboardShell({ user, settings, children }: Props) {
 	// Filter nav items based on role permissions.
 	// PUBLIC items (Dashboard, Chat, Reminders) always show.
 	// All other items require at least one matching permission.
-	const ALWAYS_VISIBLE = new Set(['Dashboard', 'Workspace', 'Pipeline', 'Calendar', 'Chat']);
+	const ALWAYS_VISIBLE = new Set(['Dashboard', 'Workspace', 'Pipeline', 'Reminders', 'Calendar', 'Chat']);
 
 	const visibleNavItems = ALL_NAV_ITEMS.map(item => {
 		// Always visible items — no permission required
 		if (ALWAYS_VISIBLE.has(item.name)) return item;
 		// Admins see everything
 		if (isAdmin) return item;
-		if (item.name === 'Settings') return { ...item, href: '/settings/profile' };
 
 		// Check if any of this item's routes is permitted
 		const hrefsToCheck = [item.href, ...(item.alternateHrefs || [])];

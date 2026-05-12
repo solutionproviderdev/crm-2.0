@@ -46,7 +46,8 @@ export default function RemindersPageContent({
   const [processingReminder, setProcessingReminder] = useState<FollowUpWithLead | null>(null);
 
   const isAdmin = currentUser?.type === "Admin";
-  const operators = initialUsers.filter(u => u.type === "Operator" || u.role?.name?.includes("CRE"));
+  // All active users — not just CRE — since any user can be assigned a lead
+  const operators = initialUsers;
 
   // Refetch when filters change
   useEffect(() => {
@@ -59,7 +60,9 @@ export default function RemindersPageContent({
       const result = await getFollowUps({
         startDate: start,
         endDate: end,
-        creId: isAdmin && selectedUser !== "all" ? selectedUser : (!isAdmin ? currentUser?.id : undefined),
+        // Use ownerId (checks all 3 assignment columns) — works for both old
+        // and new assignment system. Non-admins always scoped to their own id.
+        ownerId: isAdmin && selectedUser !== "all" ? selectedUser : (!isAdmin ? currentUser?.id : undefined),
         status: activeStatus === "all" ? undefined : activeStatus
       });
 

@@ -28,14 +28,16 @@ async function getUserClient() {
  *
  * @param params.startDate - ISO datetime string for range start
  * @param params.endDate - ISO datetime string for range end
- * @param params.creId - Optional: filter by lead's assigned CRE
- * @param params.salesExecutiveId - Optional: filter by lead's assigned sales executive
+ * @param params.ownerId - Optional: filter to leads owned by this user (checks all 3 assignment fields)
  * @param params.status - Optional: filter by follow-up status (Pending, Complete, etc.)
  */
 export async function getFollowUps(params: {
   startDate: string;
   endDate: string;
+  ownerId?: string;
+  /** @deprecated Use ownerId — kept for backward compat with old callers */
   creId?: string;
+  /** @deprecated Use ownerId — kept for backward compat with old callers */
   salesExecutiveId?: string;
   status?: string;
 }): Promise<ActionResult<LeadFollowUp[]>> {
@@ -52,12 +54,15 @@ export async function getFollowUps(params: {
       *,
       assigned_user:users(id, name, nickname, profile_picture),
       lead:leads(
-        id, 
-        name, 
-        cid, 
-        phones, 
+        id,
+        name,
+        cid,
+        phones,
         address,
+        status,
         requirements,
+        current_owner_id,
+        current_owner:users!leads_current_owner_id_fkey(id, name, nickname, profile_picture),
         cre:users!leads_cre_id_fkey(id, name, nickname, profile_picture),
         sales_executive:users!leads_sales_executive_id_fkey(id, name, nickname, profile_picture),
         comments:lead_comments(comment, created_at, user:users(id, name, profile_picture))
@@ -73,9 +78,16 @@ export async function getFollowUps(params: {
     });
 
   if (params.status) query = query.eq("status", params.status);
-  if (params.creId) query = query.eq("lead.cre_id", params.creId);
-  if (params.salesExecutiveId)
-    query = query.eq("lead.sales_executive_id", params.salesExecutiveId);
+
+  // New system: ownerId checks all 3 assignment columns so both old and new
+  // assigned leads appear for the user regardless of which field was set.
+  const effectiveOwner = params.ownerId ?? params.creId ?? params.salesExecutiveId;
+  if (effectiveOwner) {
+    query = query.or(
+      `cre_id.eq.${effectiveOwner},sales_executive_id.eq.${effectiveOwner},current_owner_id.eq.${effectiveOwner}`,
+      { referencedTable: "lead" }
+    );
+  }
 
   const { data, error } = await query;
   if (error) return { success: false, error: error.message };

@@ -154,44 +154,24 @@ export function LeadSidebar({
                 <LeadCommentsSidebar lead={lead} />
               </SidebarSection>
 
-              <SidebarSection 
-                title="Assignment Details" 
+              <SidebarSection
+                title="Assignment"
                 icon={<UserCheck className="w-4 h-4 text-blue-500" />}
               >
-                <div className="space-y-6 pt-2">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 px-1">CRE</span>
-                    </div>
-                    <UserSelect 
-                      users={allUsers}
-                      value={lead.cre_id || ""}
-                      onSelect={async (val) => {
-                        const res = await bulkAssignLeads([lead.id], val, 'cre');
-                        if (res.success) toast.success("CRE updated");
-                        else toast.error(res.error);
-                      }}
-                      excludeIds={lead.sales_executive_id ? [lead.sales_executive_id] : []}
-                      placeholder="Select CRE"
-                    />
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 px-1">Assign Owner</span>
                   </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 px-1">Sales Executive</span>
-                    </div>
-                    <UserSelect 
-                      users={allUsers}
-                      value={lead.sales_executive_id || ""}
-                      onSelect={async (val) => {
-                        const res = await bulkAssignLeads([lead.id], val, 'sales');
-                        if (res.success) toast.success("Sales Executive updated");
-                        else toast.error(res.error);
-                      }}
-                      excludeIds={lead.cre_id ? [lead.cre_id] : []}
-                      placeholder="Select Executive"
-                    />
-                  </div>
+                  <UserSelect
+                    users={allUsers}
+                    value={lead.current_owner_id || lead.cre_id || ""}
+                    onSelect={async (val) => {
+                      const res = await bulkAssignLeads([lead.id], val);
+                      if (res.success) toast.success("Owner updated");
+                      else toast.error(res.error);
+                    }}
+                    placeholder="Select owner"
+                  />
                 </div>
               </SidebarSection>
 

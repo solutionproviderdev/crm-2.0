@@ -85,12 +85,12 @@ export function LeadTable({ leads, sortBy, sortOrder, onSort, users, onOpenSideb
     }
   };
 
-  const handleBulkAssign = async (userId: string, type: 'cre' | 'sales') => {
+  const handleBulkAssign = async (userId: string) => {
     setIsAssigning(true);
     const toastId = toast.loading(`Assigning ${selectedLeads.length} leads...`);
-    
+
     try {
-      const result = await bulkAssignLeads(selectedLeads, userId, type);
+      const result = await bulkAssignLeads(selectedLeads, userId);
       if (result.success) {
         toast.success(`Successfully assigned ${selectedLeads.length} leads`, { id: toastId });
         setSelectedLeads([]);
@@ -387,21 +387,11 @@ export function LeadTable({ leads, sortBy, sortOrder, onSort, users, onOpenSideb
 
             <div className="flex items-center gap-4">
               <div className="flex flex-col gap-1 w-56">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Assign To CRE</span>
-                <UserSelect 
-                  users={users} 
-                  placeholder="Select CRE..." 
-                  onSelect={(userId) => handleBulkAssign(userId, 'cre')}
-                  className="h-10"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1 w-56">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Assign To Sales</span>
-                <UserSelect 
-                  users={users} 
-                  placeholder="Select Sales..." 
-                  onSelect={(userId) => handleBulkAssign(userId, 'sales')}
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Assign Owner</span>
+                <UserSelect
+                  users={users}
+                  placeholder="Select owner..."
+                  onSelect={(userId) => handleBulkAssign(userId)}
                   className="h-10"
                 />
               </div>

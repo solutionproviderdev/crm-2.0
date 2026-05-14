@@ -3,6 +3,7 @@
 import { revalidatePath, updateTag } from "next/cache";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { logLeadActivity } from "@/lib/lead-activity-logger";
 import type {
@@ -206,21 +207,26 @@ export async function addLeadPhone(
  */
 export async function bulkAssignLeads(
   leadIds: string[],
-  userId: string,
-  type: "cre" | "sales"
+  userId: string
 ): Promise<ActionResult<boolean>> {
   const supabase = await getUserClient();
+  const adminClient = createAdminClient();
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  const updateData =
-    type === "cre"
-      ? { cre_id: userId }
-      : { sales_executive_id: userId };
+  // Resolve the target user's department so current_department_id stays in sync
+  const { data: targetUser } = await adminClient
+    .from("users")
+    .select("department_id")
+    .eq("id", userId)
+    .single();
 
   const { error } = await supabase
     .from("leads")
-    .update(updateData)
+    .update({
+      current_owner_id: userId,
+      current_department_id: targetUser?.department_id ?? null,
+    })
     .in("id", leadIds);
 
   if (error) return { success: false, error: error.message };
@@ -235,7 +241,7 @@ export async function bulkAssignLeads(
       leadId,
       actorId: user?.id,
       action: "lead.assigned.bulk",
-      metadata: { assignedUserId: userId, role: type, totalInBatch: leadIds.length },
+      metadata: { assignedUserId: userId, totalInBatch: leadIds.length },
     });
   }
 

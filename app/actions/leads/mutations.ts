@@ -401,18 +401,20 @@ export async function updateLeadProjectStatus(
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Fetch current project status for the diff
-  const { data: prev } = await supabase
-    .from("leads")
-    .select("project_status")
-    .eq("id", leadId)
-    .single();
+  // Fetch current project status (for diff log) + resolve "Ongoing" pipeline
+  // status so the DB history trigger fires when current_status_id changes.
+  const [{ data: prev }, { data: ongoingStatus }] = await Promise.all([
+    supabase.from("leads").select("project_status").eq("id", leadId).single(),
+    adminClient.from("pipeline_statuses").select("id, stage_id").eq("name", "Ongoing").single(),
+  ]);
 
   const { error } = await supabase
     .from("leads")
     .update({
       status: "Ongoing",
       project_status: { status, subStatus },
+      current_status_id: ongoingStatus?.id ?? null,
+      current_stage_id: ongoingStatus?.stage_id ?? null,
     })
     .eq("id", leadId);
 

@@ -1,7 +1,8 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { createClient as createStandardClient } from "@/utils/supabase/server";
 import { createAdminClient as createServiceRoleClient } from "@/utils/supabase/admin";
 import type {
@@ -120,6 +121,11 @@ export async function createUser(
     .single();
 
   if (error) return { success: false, error: error.message };
+
+  updateTag(CACHE_TAGS.USERS);
+  revalidatePath("/users");
+  revalidatePath("/leads");
+
   return { success: true, data: data as User };
 }
 
@@ -136,6 +142,11 @@ export async function updateUser(
     .single();
 
   if (error) return { success: false, error: error.message };
+
+  updateTag(CACHE_TAGS.USERS);
+  revalidatePath("/users");
+  revalidatePath("/leads");
+
   return { success: true, data: data as User };
 }
 
@@ -155,6 +166,11 @@ export async function updateUserStatuses(
     .eq("id", id);
 
   if (error) return { success: false, error: error.message };
+
+  updateTag(CACHE_TAGS.USERS);
+  revalidatePath("/users");
+  revalidatePath("/leads");
+
   return { success: true, data: null };
 }
 
@@ -323,8 +339,10 @@ export async function bulkCreateUsers(
     result.succeeded++;
   }
 
+  updateTag(CACHE_TAGS.USERS);
   revalidatePath("/users");
   revalidatePath("/dashboard");
+  revalidatePath("/leads");
 
   return result;
 }

@@ -12,11 +12,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { 
-  Phone, 
-  MoreVertical, 
-  ChevronDown, 
-  Columns, 
+import {
+  Phone,
+  MoreVertical,
+  ChevronDown,
+  Columns,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -29,7 +29,9 @@ import {
   CheckCircle2,
   Loader2,
   SearchX,
-  Info
+  Info,
+  MessageCircle,
+  CalendarDays
 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -58,17 +60,19 @@ interface LeadTableProps {
 }
 
 const ALL_COLUMNS = [
-  { id: "lead", label: "Lead", sortable: true, field: "name" },
-  { id: "status", label: "Status", sortable: true, field: "status" },
-  { id: "team", label: "Team", sortable: false },
-  { id: "source", label: "Source", sortable: true, field: "source" },
-  { id: "joined", label: "Joined", sortable: true, field: "created_at" },
-  { id: "contact", label: "Contact", sortable: false },
-  { id: "address", label: "Address", sortable: false },
+  { id: "lead",     label: "Lead",        sortable: true,  field: "name" },
+  { id: "status",   label: "Status",      sortable: true,  field: "status" },
+  { id: "priority", label: "Priority",    sortable: false },
+  { id: "owner",    label: "Owner",       sortable: false },
+  { id: "activity", label: "Activity",    sortable: false },
+  { id: "contact",  label: "Contact",     sortable: false },
+  { id: "source",   label: "Source",      sortable: true,  field: "source" },
+  { id: "joined",   label: "Joined",      sortable: true,  field: "created_at" },
+  { id: "address",  label: "Address",     sortable: false },
 ];
 
 export function LeadTable({ leads, sortBy, sortOrder, onSort, users, onOpenSidebar }: LeadTableProps) {
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(["lead", "status", "team", "source", "joined", "contact"]);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(["lead", "status", "priority", "owner", "activity", "contact", "joined"]);
   const router = useRouter();
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
@@ -243,37 +247,59 @@ export function LeadTable({ leads, sortBy, sortOrder, onSort, users, onOpenSideb
                     </TableCell>
                   )}
 
-                  {visibleColumns.includes("team") && (
-                    <TableCell className="py-4.5">
-                      <div className="flex -space-x-2">
-                        {lead.cre && (
-                          <div className="relative group/avatar">
-                            <Avatar className="h-8 w-8 border-2 border-white ring-1 ring-gray-100 shadow-sm hover:scale-110 hover:z-20 transition-all duration-300">
-                              <AvatarImage src={lead.cre.profile_picture || ""} />
-                              <AvatarFallback className="text-[10px] bg-[var(--brand-primary)] text-white font-bold">
-                                {lead.cre.name[0]}
-                              </AvatarFallback>
+                  {visibleColumns.includes("priority") && (
+                    <TableCell className="py-4">
+                      {lead.priority && lead.priority !== "normal" ? (
+                        <span className={cn(
+                          "inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg border",
+                          lead.priority === "urgent" ? "bg-red-50 text-red-600 border-red-200" : "bg-orange-50 text-orange-600 border-orange-200"
+                        )}>
+                          {lead.priority}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-300 font-bold">—</span>
+                      )}
+                    </TableCell>
+                  )}
+
+                  {visibleColumns.includes("owner") && (() => {
+                    const owner = lead.current_owner ?? lead.cre ?? lead.sales_executive ?? null;
+                    const ownerLabel = lead.current_owner ? "Owner" : lead.cre ? "CRE" : lead.sales_executive ? "Sales" : null;
+                    return (
+                      <TableCell className="py-4">
+                        {owner ? (
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-7 w-7 border border-white shadow-sm shrink-0">
+                              <AvatarImage src={owner.profile_picture || ""} />
+                              <AvatarFallback className="text-[9px] bg-[var(--brand-primary)] text-white font-black">{owner.name[0]}</AvatarFallback>
                             </Avatar>
-                            <div className="absolute hidden group-hover/avatar:block bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-[9px] font-bold rounded-lg whitespace-nowrap z-50 shadow-xl">
-                              CRE: {lead.cre.name}
+                            <div>
+                              <p className="text-[11px] font-bold text-slate-700 leading-none">{owner.name}</p>
+                              {ownerLabel && <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{ownerLabel}</p>}
                             </div>
                           </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-300 font-bold">Unassigned</span>
                         )}
-                        {lead.sales_executive && (
-                          <div className="relative group/avatar">
-                            <Avatar className="h-8 w-8 border-2 border-white ring-1 ring-gray-100 shadow-sm hover:scale-110 hover:z-20 transition-all duration-300">
-                              <AvatarImage src={lead.sales_executive.profile_picture || ""} />
-                              <AvatarFallback className="text-[10px] bg-emerald-600 text-white font-bold">
-                                {lead.sales_executive.name[0]}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="absolute hidden group-hover/avatar:block bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-[9px] font-bold rounded-lg whitespace-nowrap z-50 shadow-xl">
-                              Sales: {lead.sales_executive.name}
-                            </div>
-                          </div>
+                      </TableCell>
+                    );
+                  })()}
+
+                  {visibleColumns.includes("activity") && (
+                    <TableCell className="py-4">
+                      <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400">
+                        {(lead.comments?.length ?? 0) > 0 && (
+                          <span className="flex items-center gap-1">
+                            <MessageCircle className="w-3 h-3" />{lead.comments!.length}
+                          </span>
                         )}
-                        {!lead.cre && !lead.sales_executive && (
-                          <span className="text-[10px] text-gray-400 font-bold italic tracking-tighter uppercase opacity-50">Unassigned</span>
+                        {(lead.meetings?.length ?? 0) > 0 && (
+                          <span className="flex items-center gap-1">
+                            <CalendarDays className="w-3 h-3" />{lead.meetings!.length}
+                          </span>
+                        )}
+                        {(lead.comments?.length ?? 0) === 0 && (lead.meetings?.length ?? 0) === 0 && (
+                          <span className="text-slate-200">—</span>
                         )}
                       </div>
                     </TableCell>

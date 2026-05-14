@@ -97,7 +97,11 @@ export async function getWorkspaceInbox(
     `
     )
     .neq("status", "Complete")
-    .lt("time", now)
+    // Strictly before today — avoids overlap with dueTodayFollowUps which
+    // covers all of today. A follow-up due earlier today is "due today" not
+    // "overdue from a previous day". Without this, items in both arrays
+    // cause duplicate React keys when merged in the component.
+    .lt("time", start)
     .order("time", { ascending: true })
     .limit(12);
 
@@ -236,10 +240,13 @@ export async function getWorkspaceFollowUps(
 ): Promise<ActionResult<WorkspaceFollowUpItem[]>> {
   const inbox = await getWorkspaceInbox(scope);
   if (!inbox.success) return inbox;
-  return {
-    success: true,
-    data: [...inbox.data.overdueFollowUps, ...inbox.data.dueTodayFollowUps],
-  };
+  // Deduplicate by id as a safety net (both lists share the same table;
+  // edge cases can still produce overlapping rows).
+  const seen = new Set<string>();
+  const merged = [...inbox.data.overdueFollowUps, ...inbox.data.dueTodayFollowUps].filter(
+    (item) => { if (seen.has(item.id)) return false; seen.add(item.id); return true; }
+  );
+  return { success: true, data: merged };
 }
 
 export async function getWorkspaceSupportRequests(

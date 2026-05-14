@@ -439,19 +439,9 @@ export async function fixMeetingForLead(params: {
           }
         })()
       : Promise.resolve(),
-    logLeadEvent({
-      leadId: params.leadId,
-      actorId: user.id,
-      eventType: "meeting",
-      note: params.comment || "Meeting fixed",
-      metadata: {
-        outcome: "fixed",
-        meeting_id: meeting.id,
-        date: params.meetingData.date,
-        slot: params.meetingData.slot,
-        sales_executive_id: params.meetingData.sales_executive_id,
-      },
-    }),
+    // NOTE: No logLeadEvent here — the DB trigger log_lead_status_history
+    // already creates a status_change row when current_status_id changes to
+    // "Meeting Fixed". A second call would produce a duplicate timeline entry.
   ]);
 
   return { success: true, data: meeting as LeadMeeting };

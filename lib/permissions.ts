@@ -76,7 +76,9 @@ export const PERMISSION_ROUTE_MAP: Record<string, string> = {
   // CRE Lead access
   "CRE - Lead:Lead Center": "/leads",
   "CRE - Lead:Lead Management": "/leads",
-  "CRE - Lead:Follow Up":   "/reminders",
+  // NOTE: "CRE - Lead:Follow Up" intentionally omitted — /reminders is in
+  // PUBLIC_DASHBOARD_ROUTES so all authenticated users can access it without
+  // a permission entry. The permission governs follow-up creation, not page access.
   // Sales
   "Sales:Lead Center":      "/leads",
   "Sales:Meeting Schedule": "/meetings/slots",

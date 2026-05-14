@@ -1,19 +1,14 @@
 "use client";
 
 import { Lead } from "@/lib/types";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { 
-  Phone, 
-  MessageSquare, 
-  MapPin, 
-  Clock, 
-  ArrowRight,
-  Info
+import {
+  Phone, MessageCircle, MapPin, Clock, ArrowRight, Info,
+  CalendarDays, AlertTriangle, Flame
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, isPast, parseISO } from "date-fns";
 import Link from "next/link";
 import { cn } from "@/utils/cn";
 
@@ -22,183 +17,198 @@ interface LeadCardProps {
   onOpenSidebar?: () => void;
 }
 
+// Status → colour mapping
+const STATUS_STYLES: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+  "New":             { bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-100",    dot: "bg-blue-400" },
+  "Fresh":           { bg: "bg-sky-50",     text: "text-sky-700",     border: "border-sky-100",     dot: "bg-sky-400" },
+  "Contacted":       { bg: "bg-indigo-50",  text: "text-indigo-700",  border: "border-indigo-100",  dot: "bg-indigo-400" },
+  "Meeting Fixed":   { bg: "bg-teal-50",    text: "text-teal-700",    border: "border-teal-100",    dot: "bg-teal-400" },
+  "Meeting Complete":{ bg: "bg-cyan-50",    text: "text-cyan-700",    border: "border-cyan-100",    dot: "bg-cyan-400" },
+  "Ongoing":         { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-100",   dot: "bg-amber-400" },
+  "Sold":            { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-100", dot: "bg-emerald-400" },
+  "Lost":            { bg: "bg-rose-50",    text: "text-rose-600",    border: "border-rose-100",    dot: "bg-rose-400" },
+  "Closed":          { bg: "bg-slate-50",   text: "text-slate-600",   border: "border-slate-200",   dot: "bg-slate-400" },
+};
+const DEFAULT_STATUS = { bg: "bg-gray-50", text: "text-gray-600", border: "border-gray-200", dot: "bg-gray-400" };
+
+const PRIORITY_STYLES: Record<string, { label: string; classes: string } | undefined> = {
+  high:   { label: "High",   classes: "bg-orange-50 text-orange-600 border-orange-200" },
+  urgent: { label: "Urgent", classes: "bg-red-50 text-red-600 border-red-200" },
+};
+
 export function LeadCard({ lead, onOpenSidebar }: LeadCardProps) {
-  // Get latest comment
-  const latestComment = lead.comments && lead.comments.length > 0 ? lead.comments[0] : null;
-  // Get next/latest meeting
-  const nextMeeting = lead.meetings && lead.meetings.length > 0 ? lead.meetings[0] : null;
+  const st = STATUS_STYLES[lead.status] ?? DEFAULT_STATUS;
+  const priority = PRIORITY_STYLES[lead.priority?.toLowerCase() ?? ""];
+
+  // Owner: prefer new system, fallback to legacy
+  const owner = lead.current_owner ?? lead.cre ?? lead.sales_executive ?? null;
+  const ownerLabel = lead.current_owner ? "Owner" : lead.cre ? "CRE" : lead.sales_executive ? "Sales" : null;
+
+  // Contact
+  const phone = lead.phones?.[0] ?? null;
+  const extraPhones = (lead.phones?.length ?? 0) - 1;
+  const area = [lead.address?.area, lead.address?.district].filter(Boolean).join(", ");
+
+  // Activity counts
+  const commentCount = lead.comments?.length ?? 0;
+  const meetingCount = lead.meetings?.length ?? 0;
+
+  // Next pending follow-up
+  const nextFollowUp = lead.follow_ups
+    ?.filter(f => f.status !== "Complete" && f.status !== "Late Complete")
+    .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())[0] ?? null;
+  const followUpOverdue = nextFollowUp ? isPast(parseISO(nextFollowUp.time)) : false;
+
+  // Requirements
+  const reqs = lead.requirements ?? [];
+  const visibleReqs = reqs.slice(0, 3);
+  const extraReqs = reqs.length - visibleReqs.length;
+
+  // Finance
+  const finance = lead.finance;
+  const soldAmt = finance?.soldAmount ?? 0;
+  const paidAmt = finance?.totalPayment ?? 0;
+  const dueAmt  = finance?.totalDue ?? 0;
+  const payPct  = soldAmt > 0 ? Math.min(100, Math.round((paidAmt / soldAmt) * 100)) : 0;
+
+  const isLostOrClosed = lead.status === "Lost" || lead.status === "Closed";
+  const lostNote = lead.lost_reason ?? lead.close_reason ?? null;
 
   return (
-    <Card className="group relative hover:border-[var(--brand-primary)]/40 transition-all duration-500 shadow-sm hover:shadow-2xl hover:-translate-y-1.5 overflow-hidden bg-white rounded-4xl border-gray-100/80 ring-1 ring-gray-100/50">
-      {/* Top Gradient Accent */}
-      <div className={cn(
-        "absolute top-0 left-0 right-0 h-1.5 transition-opacity duration-500",
-        lead.status === "New" ? "bg-blue-400" :
-        lead.status === "Sold" ? "bg-emerald-400" :
-        lead.status === "Meeting Fixed" ? "bg-teal-400" :
-        "bg-gray-200"
-      )} />
+    <div className={cn(
+      "group relative bg-white rounded-3xl border border-slate-100 shadow-sm",
+      "hover:shadow-xl hover:-translate-y-1 hover:border-slate-200 transition-all duration-300 overflow-hidden flex flex-col"
+    )}>
+      {/* Top accent bar */}
+      <div className={cn("h-1 w-full", st.dot)} />
 
+      <div className="p-4 flex flex-col gap-3 flex-1">
 
-      <CardContent className="p-6">
-        <div className="flex justify-between items-start mb-5">
-          <Badge 
-            variant="secondary" 
-            className={cn(
-              "font-bold text-[9px] px-3 py-1 rounded-full uppercase tracking-widest border shadow-sm transition-all duration-300 group-hover:scale-105",
-              lead.status === "New" ? "bg-blue-50 text-blue-600 border-blue-100" :
-              lead.status === "Sold" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-              lead.status === "Meeting Fixed" ? "bg-teal-50 text-teal-600 border-teal-100" :
-              "bg-gray-50 text-gray-600 border-gray-200"
-            )}
-          >
+        {/* Row 1: Status + Priority + Sidebar btn */}
+        <div className="flex items-center gap-2">
+          <span className={cn("inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border", st.bg, st.text, st.border)}>
+            <span className={cn("w-1.5 h-1.5 rounded-full", st.dot)} />
             {lead.status}
-          </Badge>
-
-          <div className="flex items-center gap-2">
-            <div className="flex -space-x-2.5">
-              {lead.cre && (
-                <div className="relative group/avatar">
-                  <Avatar className="h-8 w-8 border-2 border-white ring-1 ring-gray-100 shadow-sm transition-transform duration-300 hover:scale-110 hover:z-20">
-                    <AvatarImage src={lead.cre.profile_picture || ""} />
-                    <AvatarFallback className="text-[10px] bg-[var(--brand-primary)] text-white font-bold">
-                      {lead.cre.name[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="absolute hidden group-hover/avatar:block bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-[9px] font-bold rounded-lg whitespace-nowrap z-50 shadow-xl animate-in fade-in zoom-in duration-200">
-                    CRE: {lead.cre.name}
-                  </div>
-                </div>
-              )}
-              {lead.sales_executive && (
-                <div className="relative group/avatar">
-                  <Avatar className="h-8 w-8 border-2 border-white ring-1 ring-gray-100 shadow-sm transition-transform duration-300 hover:scale-110 hover:z-20">
-                    <AvatarImage src={lead.sales_executive.profile_picture || ""} />
-                    <AvatarFallback className="text-[10px] bg-emerald-600 text-white font-bold">
-                      {lead.sales_executive.name[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="absolute hidden group-hover/avatar:block bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-[9px] font-bold rounded-lg whitespace-nowrap z-50 shadow-xl animate-in fade-in zoom-in duration-200">
-                    Sales: {lead.sales_executive.name}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Info Icon Trigger */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={(e) => {
-                e.preventDefault();
-                onOpenSidebar?.();
-              }}
-              className="h-8 w-8 rounded-full border border-gray-100 shadow-sm text-gray-400 hover:text-[var(--brand-primary)] hover:bg-gray-50 transition-all active:scale-95 translate-y-0.5"
-            >
-              <Info className="h-4.5 w-4.5" />
-            </Button>
-          </div>
+          </span>
+          {priority && (
+            <span className={cn("inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg border", priority.classes)}>
+              {lead.priority === "urgent" ? <Flame className="w-2.5 h-2.5" /> : <AlertTriangle className="w-2.5 h-2.5" />}
+              {priority.label}
+            </span>
+          )}
+          <button
+            onClick={(e) => { e.preventDefault(); onOpenSidebar?.(); }}
+            className="ml-auto h-7 w-7 rounded-xl border border-slate-100 flex items-center justify-center text-slate-300 hover:text-[var(--brand-primary)] hover:border-[var(--brand-primary)]/30 hover:bg-[var(--brand-primary)]/5 transition-all"
+          >
+            <Info className="w-3.5 h-3.5" />
+          </button>
         </div>
 
-        <Link href={`/leads/${lead.id}`} className="block group/link mb-5">
-          <h3 className="font-extrabold text-gray-900 text-lg group-hover/link:text-[var(--brand-primary)] transition-colors line-clamp-1 mb-1 tracking-tight">
+        {/* Row 2: Identity */}
+        <Link href={`/leads/${lead.id}`} className="block group/name">
+          <h3 className="font-black text-slate-800 text-[15px] leading-tight group-hover/name:text-[var(--brand-primary)] transition-colors line-clamp-1 uppercase tracking-tight">
             {lead.name}
           </h3>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-gray-400 font-extrabold tracking-widest uppercase py-0.5 px-2 bg-gray-50 rounded-md border border-gray-100">
-               ID: {lead.cid || "Pending"}
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <span className="text-[9px] font-black tracking-widest text-[var(--brand-primary)] bg-[var(--brand-primary)]/5 border border-[var(--brand-primary)]/10 px-2 py-0.5 rounded-md uppercase">
+              {lead.cid || "—"}
             </span>
-            <span className="text-[10px] text-gray-400 font-bold italic opacity-60">
-              via {lead.source}
-            </span>
+            <span className="text-[9px] font-bold text-slate-400 italic">{lead.source}</span>
+            {lead.page_info?.pageName && (
+              <span className="text-[9px] font-bold text-slate-400 italic">· {lead.page_info.pageName}</span>
+            )}
           </div>
         </Link>
 
-        {/* Enrichment: Latest Comment */}
-        {latestComment && (
-          <div className="mb-5 p-3 rounded-2xl bg-[var(--brand-primary)]/5 border border-[var(--brand-primary)]/10 group-hover:bg-[var(--brand-primary)]/10 transition-colors duration-300">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <MessageSquare className="h-3 w-3 text-[var(--brand-primary)]" />
-              <span className="text-[10px] font-extrabold text-[var(--brand-primary)] uppercase tracking-wider">Latest Activity</span>
-            </div>
-            <p className="text-[11px] text-gray-600 line-clamp-2 leading-relaxed font-medium italic">
-              &ldquo;{latestComment.comment}&rdquo;
-            </p>
+        {/* Row 3: Owner strip */}
+        {owner && (
+          <div className="flex items-center gap-2">
+            <Avatar className="h-6 w-6 border border-white shadow-sm shrink-0">
+              <AvatarImage src={owner.profile_picture || ""} />
+              <AvatarFallback className="text-[9px] bg-[var(--brand-primary)] text-white font-black">{owner.name[0]}</AvatarFallback>
+            </Avatar>
+            <span className="text-[10px] font-bold text-slate-600 truncate">{owner.name}</span>
+            {ownerLabel && (
+              <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-md ml-auto shrink-0">{ownerLabel}</span>
+            )}
           </div>
         )}
 
-        <div className="space-y-2.5 mb-6">
-           <div className="flex items-center gap-2.5 text-[11px] font-bold text-gray-600 group/item">
-             <div className="p-1.5 rounded-lg bg-gray-50 text-gray-400 group-hover/item:text-[var(--brand-primary)] group-hover/item:bg-[var(--brand-primary)]/10 transition-all duration-300">
-               <Phone className="h-3.5 w-3.5" />
-             </div>
-             <span className="tracking-tight">{lead.phones[0]}</span>
-           </div>
-           
-           <div className="flex items-start gap-2.5 text-[11px] font-bold text-gray-600 group/item">
-             <div className="p-1.5 rounded-lg bg-gray-50 text-gray-400 group-hover/item:text-[var(--brand-primary)] group-hover/item:bg-[var(--brand-primary)]/10 transition-all duration-300 shrink-0">
-               <MapPin className="h-3.5 w-3.5" />
-             </div>
-             <span className="line-clamp-2 leading-snug italic font-medium opacity-80">
-                {lead.address.area ? `${lead.address.area}, ${lead.address.district}` : "No verified address"}
-             </span>
-           </div>
+        {/* Row 4: Contact */}
+        {phone && (
+          <div className="flex items-center gap-2 text-[11px] font-bold text-slate-600">
+            <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span>{phone}</span>
+            {extraPhones > 0 && <span className="text-[9px] text-slate-400 font-bold">+{extraPhones}</span>}
+            {area && <span className="text-[9px] text-slate-400 font-bold ml-auto flex items-center gap-1 truncate"><MapPin className="w-3 h-3 shrink-0" />{area}</span>}
+          </div>
+        )}
 
-           {nextMeeting && (
-             <div className="flex items-center gap-2.5 text-[11px] font-bold text-[var(--brand-primary)] group/item">
-                <div className="p-1.5 rounded-lg bg-[var(--brand-primary)]/5 group-hover/item:bg-[var(--brand-primary)]/20 transition-all duration-300">
-                  <Clock className="h-3.5 w-3.5" />
-                </div>
-                <span>Meeting: {format(new Date(nextMeeting.date || nextMeeting.created_at), "MMM d, h:mm a")}</span>
-             </div>
-           )}
+        {/* Row 5: Requirements */}
+        {visibleReqs.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {visibleReqs.map((r, i) => (
+              <span key={i} className="text-[9px] font-black uppercase tracking-wider bg-slate-50 border border-slate-100 text-slate-500 px-2 py-0.5 rounded-lg">{r}</span>
+            ))}
+            {extraReqs > 0 && <span className="text-[9px] font-black text-slate-400">+{extraReqs}</span>}
+          </div>
+        )}
+
+        {/* Row 6: Activity bar */}
+        <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400">
+          {commentCount > 0 && (
+            <span className="flex items-center gap-1">
+              <MessageCircle className="w-3 h-3" />{commentCount}
+            </span>
+          )}
+          {meetingCount > 0 && (
+            <span className="flex items-center gap-1">
+              <CalendarDays className="w-3 h-3" />{meetingCount}
+            </span>
+          )}
+          {nextFollowUp && (
+            <span className={cn("flex items-center gap-1 ml-auto", followUpOverdue ? "text-red-500 font-black" : "text-slate-400")}>
+              <Clock className="w-3 h-3" />
+              {followUpOverdue ? "Overdue" : format(parseISO(nextFollowUp.time), "MMM d, h:mm a")}
+            </span>
+          )}
         </div>
 
-        {/* Enrichment: Payment Progress (If Sold) */}
-        {lead.status === "Sold" && lead.finance?.soldAmount && (
-          <div className="mb-6 space-y-2">
-            <div className="flex justify-between items-center text-[10px] font-extrabold uppercase tracking-tighter">
-              <span className="text-gray-400">Project Value</span>
-              <span className="text-emerald-600">৳{lead.finance.soldAmount.toLocaleString()}</span>
+        {/* Row 7: Finance (Sold leads) */}
+        {soldAmt > 0 && (
+          <div className="space-y-1.5 pt-1 border-t border-slate-50">
+            <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-slate-400">
+              <span>Sold ৳{soldAmt.toLocaleString()}</span>
+              <span className={dueAmt > 0 ? "text-rose-500" : "text-emerald-500"}>
+                {dueAmt > 0 ? `Due ৳${dueAmt.toLocaleString()}` : "Cleared"}
+              </span>
             </div>
-            <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-50">
-              <div 
-                className="h-full bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all duration-1000 ease-out"
-                style={{ width: `${Math.min(100, (lead.finance.totalPayment || 0) / (lead.finance.soldAmount || 1) * 100)}%` }}
-              />
-            </div>
-            <div className="flex justify-between items-center text-[9px] font-bold italic text-gray-400">
-              <span>Paid: ৳{(lead.finance.totalPayment || 0).toLocaleString()}</span>
-              <span>{Math.round((lead.finance.totalPayment || 0) / (lead.finance.soldAmount || 1) * 100)}%</span>
+            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-full bg-emerald-400 rounded-full transition-all duration-700" style={{ width: `${payPct}%` }} />
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3 pt-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-10 gap-2 rounded-xl font-bold text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all active:scale-95 shadow-sm"
-            asChild
-          >
-            <a href={`tel:${lead.phones[0]}`}>
-               <Phone className="h-3.5 w-3.5 text-gray-400" />
-               Call
-            </a>
-          </Button>
-          <Button 
-            variant="default" 
-            size="sm" 
-            className="h-10 gap-2 bg-[var(--brand-primary)] hover:bg-[#035170] shadow-md shadow-[var(--brand-primary)]/20 font-bold transition-all active:scale-95 rounded-xl group/btn"
-            asChild
-          >
-            <Link href={`/leads/${lead.id}`}>
-               Details
-               <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover/btn:translate-x-1" />
-            </Link>
+        {/* Row 8: Lost/close reason */}
+        {isLostOrClosed && lostNote && (
+          <div className="text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-100 rounded-xl px-2.5 py-1.5 line-clamp-2 italic">
+            {lostNote}
+          </div>
+        )}
+
+        {/* Row 9: Actions */}
+        <div className="flex gap-2 mt-auto pt-2">
+          {phone && (
+            <Button variant="outline" size="sm" className="flex-1 h-9 gap-1.5 rounded-xl font-bold text-slate-600 border-slate-200 hover:bg-slate-50 text-xs" asChild>
+              <a href={`tel:${phone}`}><Phone className="w-3.5 h-3.5" />Call</a>
+            </Button>
+          )}
+          <Button variant="default" size="sm" className="flex-1 h-9 gap-1.5 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/90 shadow-sm font-bold text-xs rounded-xl" asChild>
+            <Link href={`/leads/${lead.id}`}>Details<ArrowRight className="w-3.5 h-3.5" /></Link>
           </Button>
         </div>
-      </CardContent>
-    </Card>
+
+      </div>
+    </div>
   );
 }

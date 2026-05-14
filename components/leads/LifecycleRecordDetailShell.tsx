@@ -487,7 +487,9 @@ function getEventTitle(item: LeadLifecycleTimeline["statusHistory"][number]): st
   if (type === "follow_up") return "Follow-up scheduled";
   if (type === "meeting") {
     const outcome = (item.metadata as Record<string, unknown>)?.outcome;
-    return outcome === "sold" ? "Lead marked as sold" : "Meeting completed";
+    if (outcome === "sold") return "Lead marked as sold";
+    if (outcome === "fixed") return "Meeting fixed";
+    return "Meeting completed";
   }
   if (type === "support_request") return item.note || "Support requested";
   return item.note || "Activity recorded";

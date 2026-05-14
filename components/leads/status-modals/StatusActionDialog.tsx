@@ -167,8 +167,10 @@ export function StatusActionDialog({
             projectStatus.subStatus,
             comment
           );
-          if (result.success && (targetStatusId || targetStageId)) {
-            await updateLead(lead.id, buildStatusUpdate());
+          if (result.success) {
+            // attachStatusNote always runs — updateLeadProjectStatus already
+            // sets current_status_id so the history trigger fires without a
+            // second updateLead call.
             await attachStatusNote(lead.id, comment || `Status set to Ongoing`);
           }
           break;

@@ -30,12 +30,13 @@ import type {
 export async function getFilteredLeads(params: {
   page?: number;
   limit?: number;
-  status?: string;
+  status?: string | string[];
   source?: string;
   startDate?: string;
   endDate?: string;
   creId?: string;
   salesExecutiveId?: string;
+  ownerId?: string;
   search?: string;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
@@ -61,6 +62,7 @@ export async function getFilteredLeads(params: {
     endDate,
     creId,
     salesExecutiveId,
+    ownerId,
     search,
     sortBy = "created_at",
     sortOrder = "desc",
@@ -105,8 +107,16 @@ export async function getFilteredLeads(params: {
       `name.ilike.%${search}%,cid.ilike.%${search}%,address->>address.ilike.%${search}%,address->>area.ilike.%${search}%,address->>district.ilike.%${search}%,address->>division.ilike.%${search}%`
     );
   } else {
-    if (status) query = query.eq("status", status);
+    if (status) {
+      const statuses = Array.isArray(status) ? status : [status];
+      if (statuses.length === 1) {
+        query = query.eq("status", statuses[0]);
+      } else {
+        query = query.in("status", statuses);
+      }
+    }
     if (source) query = query.eq("source", source);
+    if (ownerId) query = query.or(`cre_id.eq.${ownerId},sales_executive_id.eq.${ownerId},current_owner_id.eq.${ownerId}`);
     if (creId) query = query.eq("cre_id", creId);
     if (salesExecutiveId)
       query = query.eq("sales_executive_id", salesExecutiveId);

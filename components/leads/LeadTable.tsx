@@ -35,6 +35,7 @@ import { format } from "date-fns";
 import Link from "next/link";
 import { cn } from "@/utils/cn";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -68,6 +69,7 @@ const ALL_COLUMNS = [
 
 export function LeadTable({ leads, sortBy, sortOrder, onSort, users, onOpenSidebar }: LeadTableProps) {
   const [visibleColumns, setVisibleColumns] = useState<string[]>(["lead", "status", "team", "source", "joined", "contact"]);
+  const router = useRouter();
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
 
@@ -94,6 +96,7 @@ export function LeadTable({ leads, sortBy, sortOrder, onSort, users, onOpenSideb
       if (result.success) {
         toast.success(`Successfully assigned ${selectedLeads.length} leads`, { id: toastId });
         setSelectedLeads([]);
+        router.refresh();
       } else {
         toast.error(`Failed to assign leads: ${result.error}`, { id: toastId });
       }

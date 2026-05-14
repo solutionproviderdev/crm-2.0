@@ -38,6 +38,7 @@ import { UserSelect } from "./UserSelect";
 import { bulkAssignLeads } from "@/app/actions/leads";
 import { toast } from "sonner";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 
 interface LeadSidebarProps {
@@ -57,6 +58,7 @@ export function LeadSidebar({
   lifecycleStatusGroups,
   lifecycleTransitionRules,
 }: LeadSidebarProps) {
+  const router = useRouter();
   if (!lead) return null;
 
   return (
@@ -167,7 +169,7 @@ export function LeadSidebar({
                     value={lead.current_owner_id || lead.cre_id || ""}
                     onSelect={async (val) => {
                       const res = await bulkAssignLeads([lead.id], val);
-                      if (res.success) toast.success("Owner updated");
+                      if (res.success) { toast.success("Owner updated"); router.refresh(); }
                       else toast.error(res.error);
                     }}
                     placeholder="Select owner"

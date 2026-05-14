@@ -19,8 +19,7 @@ interface LeadsPageProps {
     source?: string;
     startDate?: string;
     endDate?: string;
-    creId?: string;
-    salesId?: string;
+    ownerId?: string;
     search?: string;
     sortBy?: string;
     order?: string;
@@ -54,10 +53,10 @@ async function LeadsContent({
   const filterParams = {
     page: params.page ? parseInt(params.page) : 1,
     limit: params.limit ? parseInt(params.limit) : 20,
-    status: params.status === 'all' ? undefined : params.status,
+    // split comma-separated multi-select value into array; undefined = all
+    status: params.status ? params.status.split(",").filter(Boolean) : undefined,
     source: params.source === 'all' ? undefined : params.source,
-    creId: params.creId === 'all' ? undefined : params.creId,
-    salesExecutiveId: params.salesId === 'all' ? undefined : params.salesId,
+    ownerId: params.ownerId === 'all' ? undefined : params.ownerId,
     search: params.search || undefined,
     startDate: params.startDate || undefined,
     endDate: params.endDate || undefined,

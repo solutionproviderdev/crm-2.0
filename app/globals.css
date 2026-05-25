@@ -1,3 +1,4 @@
+@import url('https://cdn.jsdelivr.net/npm/segoe-fonts@1.0.1/segoe-fonts.min.css');
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import 'tailwindcss';
 
@@ -118,4 +119,8 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+}
+
+.font-segoe {
+  font-family: 'Segoe UI', 'Segoe UI Variable Static Display', 'Segoe UI Variable', 'Inter', sans-serif;
 }

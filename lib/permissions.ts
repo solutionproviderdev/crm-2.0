@@ -40,6 +40,10 @@ export const ALL_PERMISSIONS = [
     resource: "Transform Studio",
     actions: ["Use Transform Studio", "Review & Approve Jobs", "Admin"],
   },
+  {
+    resource: "Quotations",
+    actions: ["Create Quotation", "View Quotations"],
+  },
 ] as const;
 
 export type PermissionResource = (typeof ALL_PERMISSIONS)[number]["resource"];
@@ -52,6 +56,7 @@ export const PUBLIC_DASHBOARD_ROUTES = [
   "/reminders",
   "/chat",
   "/settings",
+  "/quotations",
 ];
 
 /**

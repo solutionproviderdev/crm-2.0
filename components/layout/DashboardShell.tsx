@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LayoutDashboard, Users, Bell, MessagesSquare, CalendarDays, Wrench, Handshake, Construction, Wand2 } from 'lucide-react';
+import { LayoutDashboard, Users, Bell, MessagesSquare, CalendarDays, Wrench, Handshake, Construction, Wand2, FileText } from 'lucide-react';
 import { logout } from '@/app/actions/auth';
 import type { User } from '@/lib/types';
 import type { PermissionMap } from '@/lib/permissions';
@@ -21,6 +21,7 @@ interface NavItem {
 const ALL_NAV_ITEMS: NavItem[] = [
 	{ name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
 	{ name: 'Leads', href: '/leads', alternateHrefs: [], icon: Users },
+	{ name: 'Quotations', href: '/quotations', icon: FileText },
 	{ name: 'Clients', href: '/clients', icon: Handshake },
 	{ name: 'Projects', href: '/projects', icon: Construction },
 	{ name: 'Reminders', href: '/reminders', icon: Bell },
@@ -65,7 +66,7 @@ export function DashboardShell({ user, settings, children }: Props) {
 	// Filter nav items based on role permissions.
 	// PUBLIC items (Dashboard, Chat, Reminders) always show.
 	// All other items require at least one matching permission.
-	const ALWAYS_VISIBLE = new Set(['Dashboard', 'Chat', 'Reminders']);
+	const ALWAYS_VISIBLE = new Set(['Dashboard', 'Chat', 'Reminders', 'Quotations']);
 
 	const visibleNavItems = ALL_NAV_ITEMS.map(item => {
 		// Always visible items — no permission required
